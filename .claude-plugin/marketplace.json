@@ -1,0 +1,13 @@
+{
+  "name": "tjs-21-mods",
+  "owner": {
+    "name": "Timo Schroeder"
+  },
+  "plugins": [
+    {
+      "name": "openpoints",
+      "source": "./"
+    }
+  ],
+  "description": "Timos Claude-Code-Mods"
+}

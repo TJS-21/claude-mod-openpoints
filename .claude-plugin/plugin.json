@@ -1,0 +1,29 @@
+{
+  "name": "openpoints",
+  "version": "0.8.0",
+  "description": "Seitenleiste mit offenen Punkten je Projekt; Punkte entstehen im Chat, Klicks in der Leiste ändern nur die Liste",
+  "types": "./types/index.d.ts",
+  "author": {
+    "name": "Timo Schroeder"
+  },
+  "userConfig": {
+    "daten_repo": {
+      "type": "string",
+      "title": "Daten-Repo",
+      "description": "GitHub-Adresse deines eigenen privaten Repos für die Listen, z. B. https://github.com/<dein-name>/claude-openpoints-daten. Es muss bereits existieren (mit README angelegt).",
+      "default": "https://github.com/TJS-21/claude-openpoints-daten"
+    },
+    "name": {
+      "type": "string",
+      "title": "Name",
+      "description": "Dein Name. Mit dem Vornamen spricht Claude dich in den Regeln an; der ganze Name steht als Autor bei jeder Änderung.",
+      "default": "Timo Schroeder"
+    },
+    "email": {
+      "type": "string",
+      "title": "E-Mail für Git",
+      "description": "Mailadresse, die als Autor der Änderungen im Daten-Repo steht, z. B. deine anonyme GitHub-Adresse (…@users.noreply.github.com).",
+      "default": "223644582+TJS-21@users.noreply.github.com"
+    }
+  }
+}
