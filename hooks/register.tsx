@@ -20,9 +20,9 @@ let AUTOR = ['-c', `user.name=${STANDARD.name}`, '-c', `user.email=${STANDARD.em
 let VORNAME = 'Timo'
 let REGELN = regeln(VORNAME)
 const SLUG = /^[a-z0-9][a-z0-9-]*$/
-// Pfeile der Seitenleiste; bewusst die größeren Dreiecke (▾/▸ wirkten zu klein), keine Emoji-Zeichen
-const PFEIL_ZU = '►'
-const PFEIL_AUF = '▼'
+// Zeichen zum Auf- und Zuklappen: mittelgroßes Dreieck (▸ zu klein, ► zu groß), aufgeklappt ein Minus
+const PFEIL_ZU = '⏵'
+const PFEIL_AUF = '−'
 const CHAT = /^https:\/\/claude\.ai\/chat\/([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})$/
 
 // Aufräumregeln
@@ -650,16 +650,20 @@ export const register: Register = (on, options) => {
     const erledigtAuf = offeneBereiche.includes('erledigt')
 
     // Pfeil zum Auf- und Zuklappen, rechts in der Zeile: ► zu, ▼ offen
-    const pfeil = (key: string, istZu: boolean, run: () => void) =>
-      alsLinks ? (
-        <Markdown key={key} text={`[${istZu ? PFEIL_ZU : PFEIL_AUF}](${ziel}#${key})`} pressableLinks={[`${ziel}#${key}`]} onLinkPress={run} />
-      ) : (
-        <Button key={key} onPress={run}>
-          {istZu ? PFEIL_ZU : PFEIL_AUF}
-        </Button>
-      )
+    // Eigene feste Spalte, damit alle Pfeile senkrecht untereinander stehen und nicht abgeschnitten werden
+    const pfeil = (key: string, istZu: boolean, run: () => void) => (
+      <Box key={`${key}-spalte`} width={2} flexShrink={0} flexDirection="row" justifyContent="center">
+        {alsLinks ? (
+          <Markdown key={key} text={`[${istZu ? PFEIL_ZU : PFEIL_AUF}](${ziel}#${key})`} pressableLinks={[`${ziel}#${key}`]} onLinkPress={run} />
+        ) : (
+          <Button key={key} onPress={run}>
+            {istZu ? PFEIL_ZU : PFEIL_AUF}
+          </Button>
+        )}
+      </Box>
+    )
     const kopf = (key: string, titel: string, n: number, istZu: boolean, run: () => void, grau: boolean) => (
-      <Box key={key} flexDirection="row" alignItems="center" justifyContent="space-between" gap={1} {...(grau ? { backgroundColor: '#3A3A3C', paddingX: 1 } : {})}>
+      <Box key={key} flexDirection="row" alignItems="center" justifyContent="space-between" gap={1} paddingX={1} {...(grau ? { backgroundColor: '#3A3A3C' } : {})}>
         <Text {...(grau ? {} : { dimColor: true, size: 'caption' as const })}>
           {titel} <Text dimColor>{grau ? n : `(${n})`}</Text>
         </Text>
@@ -703,14 +707,20 @@ export const register: Register = (on, options) => {
                 const istAuf = offeneBereiche.includes(bereich)
                 return (
                   <Box key={`punkt-${l.slug}-${p.id}`} flexDirection="column">
-                    <Box key={`titel-${l.slug}-${p.id}`} flexDirection="row" alignItems="flex-start" justifyContent="space-between" gap={1}>
-                      <Text>{alt ? '(alt?) ' : ''}{p.text}</Text>
+                    <Box key={`titel-${l.slug}-${p.id}`} flexDirection="row" alignItems="flex-start" justifyContent="space-between" gap={1} paddingX={1}>
+                      <Box flexShrink={1}>
+                        <Text>{alt ? '(alt?) ' : ''}{p.text}</Text>
+                      </Box>
                       {pfeil(`pt-${l.slug}-${p.id}`, !istAuf, umschalten(bereich, istAuf))}
                     </Box>
-                    {istAuf && p.kontext !== undefined && <Text dimColor>{p.kontext}</Text>}
-                    {istAuf && aktionen(`akt-${l.slug}-${p.id}`, liste)}
-                    {/* Web-Link zum Chat: auf dem Handy und im Terminal; in der App steckt er in „Zum Chat“ */}
-                    {istAuf && chatUrl !== undefined && (!alsLinks || !inApp) && <Link href={chatUrl}>Zum Chat</Link>}
+                    {istAuf && (
+                      <Box key={`details-${l.slug}-${p.id}`} flexDirection="column" paddingX={1}>
+                        {p.kontext !== undefined && <Text dimColor>{p.kontext}</Text>}
+                        {aktionen(`akt-${l.slug}-${p.id}`, liste)}
+                        {/* Web-Link zum Chat: auf dem Handy und im Terminal; in der App steckt er in „Zum Chat“ */}
+                        {chatUrl !== undefined && (!alsLinks || !inApp) && <Link href={chatUrl}>Zum Chat</Link>}
+                      </Box>
+                    )}
                   </Box>
                 )
               })}
