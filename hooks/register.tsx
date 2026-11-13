@@ -20,8 +20,8 @@ let AUTOR = ['-c', `user.name=${STANDARD.name}`, '-c', `user.email=${STANDARD.em
 let VORNAME = 'Timo'
 let REGELN = regeln(VORNAME)
 const SLUG = /^[a-z0-9][a-z0-9-]*$/
-// Zeichen zum Auf- und Zuklappen: mittelgroßes Dreieck (▸ zu klein, ► zu groß), aufgeklappt ein Minus
-const PFEIL_ZU = '⏵'
+// Zeichen zum Auf- und Zuklappen: zugeklappt ein mittelgroßes Dreieck nach unten (wie bei einem Drop-down), aufgeklappt ein Minus
+const PFEIL_ZU = '⏷'
 const PFEIL_AUF = '−'
 const CHAT = /^https:\/\/claude\.ai\/chat\/([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})$/
 

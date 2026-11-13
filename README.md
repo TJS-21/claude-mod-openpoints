@@ -4,7 +4,7 @@ Eine Claude-Code-Mod: offene Aufgaben je Projekt, die sich selbst füllen.
 
 ## Anzeige
 - **Band über dem Eingabefeld**: schmaler grauer Streifen „Offene Punkte: Projekt 4“, ganz rechts der Link **Öffnen** bzw. **Einklappen**, je nachdem, ob das Panel offen ist (im Terminal ein Knopf). Andere Bänder (z. B. die Nutzungsleiste) bleiben darunter sichtbar.
-- **Panel** (öffnet sich beim Start von selbst, sonst `/offene-punkte`): oben die Zahl offener Punkte, die Uhrzeit des letzten Abgleichs und **Aktualisieren**; je Projekt ein schmaler grauer Streifen; je Punkt ein kurzer Titel. Ein Pfeil rechts (► / ▼) klappt auf: darunter der Kontext (worum es geht, nächster Schritt, Anlass) und kleine Links **Erledigt · Veraltet · Zum Chat · Frage dazu**. Veraltete und erledigte Punkte stehen ganz unten, zugeklappt. Im Terminal sind die Links Knöpfe.
+- **Panel** (öffnet sich beim Start von selbst, sonst `/offene-punkte`): oben die Zahl offener Punkte, die Uhrzeit des letzten Abgleichs und **Aktualisieren**; je Projekt ein schmaler grauer Streifen; je Punkt ein kurzer Titel. Ein Pfeil rechts (⏷ zum Aufklappen, − zum Zuklappen) klappt auf: darunter der Kontext (worum es geht, nächster Schritt, Anlass) und kleine Links **Erledigt · Veraltet · Zum Chat · Frage dazu**. Veraltete und erledigte Punkte stehen ganz unten, zugeklappt. Im Terminal sind die Links Knöpfe.
 - Klicks in der Leiste ändern nur die Liste und schreiben **nichts in den laufenden Chat**; oben zeigt eine Zeile, was passiert ist („Abgehakt: …“).
   - **Erledigt** hakt ab (mit **Zurück**, 14 Tage sichtbar).
   - **Zum Chat** öffnet den Ursprungs-Chat in der Claude-App auf dem Mac; auf dem Handy gibt es nur den Web-Link.
