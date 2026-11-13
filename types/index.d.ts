@@ -18,6 +18,6 @@ export type Liste = { slug: string; projekt: string; punkte: Punkt[] }
 
 declare module 'claude-code' {
   interface PluginState {
-    openpoints: { listen: Liste[]; zu: string[]; meldung: string }
+    openpoints: { listen: Liste[]; zu: string[]; meldung: string; offen: boolean }
   }
 }

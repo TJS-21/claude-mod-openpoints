@@ -23,6 +23,7 @@ function attrappe(on: On, opts: Opts = {}) {
   const geoeffnet: string[][] = []
   const modell: { system?: string; prompt: string; model: string }[] = []
   const panes: string[] = []
+  const geschlossen: string[] = []
   const prompts: string[] = []
   let aktiv = 0
   let maxAktiv = 0
@@ -71,12 +72,16 @@ function attrappe(on: On, opts: Opts = {}) {
     modell.push({ system: e.system, prompt: e.prompt, model: e.model })
     return { value: { isAnswered: true, text: opts.modell ?? '{"neu":[],"erledigt":[]}', usage: {} } } as never
   })
+  on('ui.close', async (_$, e) => {
+    geschlossen.push(e.id)
+    return { value: undefined } as never
+  })
   on('ui.open', async (_$, e) => {
     panes.push(e.id)
     return { value: { isPlaced: true } } as never
   })
   const liste = (slug = 'web') => JSON.parse(dateien.get(`${dir}/punkte/${slug}.json`) ?? '{"punkte":[]}') as { projekt: string; punkte: Record<string, unknown>[] }
-  return { dateien, git, aufrufe, geoeffnet, modell, panes, prompts, liste, maxAktiv: () => maxAktiv }
+  return { dateien, git, aufrufe, geoeffnet, modell, panes, geschlossen, prompts, liste, maxAktiv: () => maxAktiv }
 }
 
 // ---- Speichern ----
@@ -314,6 +319,22 @@ test('das Band zeigt die offenen Punkte und öffnet das Panel', async ($, on) =>
   expect(await ui.find({ type: 'Button', key: 'band-oeffnen' })).toBeUndefined()
   await ui.press({ key: 'band-oeffnen', link: { href: 'https://github.com/TJS-21/claude-openpoints-daten' } })
   expect(a.panes).toContain('openpoints')
+})
+
+test('Öffnen wird zu Einklappen und zurück', async ($, on) => {
+  const a = attrappe(on, { punkte: [{ id: 'a', text: 'Eins', isDone: false }] })
+  await $.tool.call({ tool: SETZEN, slug: 'web', projekt: 'Web', punkte: [{ id: 'a', text: 'Eins' }] } as never)
+  const href = { href: 'https://github.com/TJS-21/claude-openpoints-daten' }
+  const band = await $.ui.mount({ plugin: 'openpoints', surface: 'desktop', component: 'AbovePrompt', props: { hasSurvey: false, isWorking: false, maxRows: 10 } } as never)
+  const wort = async () => JSON.stringify(await band.find({ type: 'Markdown', key: 'band-oeffnen' } as never))
+  expect(await wort()).toContain('[Öffnen]')
+  await band.press({ key: 'band-oeffnen', link: href })
+  expect(a.panes).toContain('openpoints')
+  expect(await wort()).toContain('[Einklappen]')
+  await band.press({ key: 'band-oeffnen', link: href })
+  expect(a.geschlossen).toEqual(['openpoints'])
+  expect(await wort()).toContain('[Öffnen]')
+  await band.unmount()
 })
 
 test('im Terminal bleibt Öffnen ein Knopf', async ($, on) => {

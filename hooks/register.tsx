@@ -30,6 +30,19 @@ const ALT_TAGE = 30
 const listen = atom({ plugin: 'openpoints', key: 'listen' } as const, [])
 const zu = atom({ plugin: 'openpoints', key: 'zu' } as const, [])
 const meldung = atom({ plugin: 'openpoints', key: 'meldung' } as const, '')
+// Ob die Seitenleiste gerade offen ist: das Band zeigt dann „Einklappen“ statt „Öffnen“
+const offen = atom({ plugin: 'openpoints', key: 'offen' } as const, false)
+
+// Seitenleiste öffnen bzw. schließen und den Zustand fürs Band merken
+async function leisteAuf($: EngineInterface) {
+  const r = await $.ui.open({ id: PANE, title: TITLE })
+  await update($, offen, () => r.isPlaced)
+  return r
+}
+async function leisteZu($: EngineInterface) {
+  await $.ui.close({ id: PANE })
+  await update($, offen, () => false)
+}
 
 type Eingabe = { slug: string; projekt: string; punkte: Array<{ id: string; text: string; isDone?: boolean; chat?: string }> }
 type Neu = { slug: string; projekt: string; text: string; chat?: string }
@@ -421,13 +434,13 @@ export const register: Register = (on, options) => {
     })
     const started = await next(e)
     void laden($)
-    void $.ui.open({ id: PANE, title: TITLE })
+    void leisteAuf($)
     return started
   })
 
   on('command.run', { command: 'offene-punkte' }, async $ => {
     await laden($)
-    const r = await $.ui.open({ id: PANE, title: TITLE })
+    const r = await leisteAuf($)
     return { text: r.isPlaced ? 'Seitenleiste geöffnet.' : `Nicht angezeigt: ${'reason' in r ? r.reason : 'unbekannt'}` }
   })
 
@@ -511,6 +524,13 @@ export const register: Register = (on, options) => {
   })
 
   // Schmales Band über dem Eingabefeld: immer sichtbare Erinnerung.
+  // Schließt die Person die Seitenleiste selbst (X), zeigt das Band wieder „Öffnen“
+  on('ui.close', { id: PANE }, async ($, e, next) => {
+    const r = await next(e)
+    await update($, offen, () => false)
+    return r
+  })
+
   on('ui.render', { component: 'AbovePrompt' }, async ($, e, next) => {
     if (e.props.hasSurvey) return next(e)
     const alle = await read($, listen)
@@ -519,17 +539,19 @@ export const register: Register = (on, options) => {
     // Was andere Mods hier zeichnen (z. B. die Nutzungsleiste), bleibt darunter stehen
     const below = await next(e)
     const { Box, Text, Button, Markdown } = $.ui.resolve(e)
-    const oeffnen = () => void $.ui.open({ id: PANE, title: TITLE })
+    const istOffen = await read($, offen)
+    const wort = istOffen ? 'Einklappen' : 'Öffnen'
+    const oeffnen = () => void (istOffen ? leisteZu($) : leisteAuf($))
     // Kleiner Text-Link statt Knopf (die App zeichnet Knöpfe in fester Größe).
     // Gibt die App den Klick nicht weiter, öffnet der Link das Listen-Repo im Browser.
     const ziel = DATEN.replace(/\.git$/, '')
     const knopf =
       e.surface === 'terminal' || !ziel.startsWith('https://') ? (
         <Button key="band-oeffnen" onPress={oeffnen}>
-          Öffnen
+          {wort}
         </Button>
       ) : (
-        <Markdown key="band-oeffnen" text={`[Öffnen](${ziel})`} pressableLinks={[ziel]} onLinkPress={oeffnen} />
+        <Markdown key="band-oeffnen" text={`[${wort}](${ziel})`} pressableLinks={[ziel]} onLinkPress={oeffnen} />
       )
     return (
       <Box flexDirection="column">

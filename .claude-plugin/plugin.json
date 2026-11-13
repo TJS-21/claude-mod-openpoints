@@ -1,6 +1,6 @@
 {
   "name": "openpoints",
-  "version": "0.8.2",
+  "version": "0.8.3",
   "description": "Seitenleiste mit offenen Punkten je Projekt; Punkte entstehen im Chat, Klicks in der Leiste ändern nur die Liste",
   "types": "./types/index.d.ts",
   "author": {
