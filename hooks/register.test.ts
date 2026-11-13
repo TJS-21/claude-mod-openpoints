@@ -43,7 +43,10 @@ function attrappe(on: On, opts: Opts = {}) {
       geoeffnet.push([...e.argv])
       return { value: { exitCode: 0, stdout: '', stderr: '' } } as never
     }
-    const args = e.argv.slice(7)
+    // git -C <dir> [-c name] [-c email] <befehl> …: die Autor-Angaben können fehlen
+    let ab = 3
+    while (e.argv[ab] === '-c') ab += 2
+    const args = e.argv.slice(ab)
     git.push(args)
     aktiv++
     maxAktiv = Math.max(maxAktiv, aktiv)
@@ -86,11 +89,11 @@ function attrappe(on: On, opts: Opts = {}) {
 
 // ---- Speichern ----
 
-test('punkte_setzen übernimmt nur https-Links als Chat-Link', async ($, on) => {
+test('punkte_setzen übernimmt nur Adressen echter Claude-Chats als Chat-Link', async ($, on) => {
   const a = attrappe(on)
   await $.tool.call({
     tool: SETZEN, slug: 'web', projekt: 'Web',
-    punkte: [{ id: 'a', text: 'Alt', chat: 'file:///etc/passwd' }, { id: 'b', text: 'Neu', chat: 'javascript:alert(1)' }],
+    punkte: [{ id: 'a', text: 'Alt', chat: 'file:///etc/passwd' }, { id: 'b', text: 'Neu', chat: 'https://claude.ai.evil.example/chat/x' }],
   } as never)
   expect(a.liste().punkte[0]?.chat).toBe(`https://claude.ai/chat/${UUID}`)
   expect(a.liste().punkte[1]?.chat).toBeUndefined()
@@ -290,11 +293,12 @@ test('auf dem Handy gibt es nur den Web-Link, keinen App-Knopf', async ($, on) =
   expect(await ui.find({ type: 'Link', text: 'Zum Chat' })).toBeDefined()
 })
 
-test('ohne gültigen Chat-Link kein App-Knopf', async ($, on) => {
+test('ohne gültigen Chat-Link weder App-Knopf noch Web-Link', async ($, on) => {
   attrappe(on, { punkte: [{ id: 'a', text: 'Offen', isDone: false, chat: 'https://example.com/x' }] })
   await $.tool.call({ tool: SETZEN, slug: 'web', projekt: 'Web', punkte: [{ id: 'a', text: 'Offen' }] } as never)
   const ui = await $.ui.mount({ ...PANE, surface: 'desktop' } as never)
   expect(await ui.find({ type: 'Button', key: 'chat-web-a' })).toBeUndefined()
+  expect(await ui.find({ type: 'Link', text: 'Zum Chat' })).toBeUndefined()
 })
 
 // ---- Klären veralteter Punkte ----
@@ -431,4 +435,12 @@ test('leere Felder fallen auf die Voreinstellung zurück', { options: { daten_re
   const commit = a.aufrufe.find(x => x.includes('commit')) ?? []
   expect(commit[2]).toBe(DIR)
   expect(commit[4]).toBe('user.name=Timo Schroeder')
+})
+
+test('eigenes Repo ohne Name und E-Mail: kein fremder Autor, eigene Git-Identität', { options: { daten_repo: 'https://github.com/anna/listen' } }, async ($, on) => {
+  const a = attrappe(on, { dir: ANNA_DIR, ohneKlon: true })
+  await $.tool.call({ tool: HINZU, punkte: [{ slug: 'allgemein', projekt: 'Allgemein', text: 'Steuer machen' }] } as never)
+  const commit = a.aufrufe.find(x => x.includes('commit')) ?? []
+  expect(commit.slice(0, 4)).toEqual(['git', '-C', ANNA_DIR, 'commit'])
+  expect(a.aufrufe.some(x => x.some(t => t.includes('TJS-21') || t.includes('Timo')))).toBe(false)
 })

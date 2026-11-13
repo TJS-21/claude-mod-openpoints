@@ -65,9 +65,13 @@ function regeln(vorname: string): string {
 function einstellen(options: Readonly<Record<string, unknown>>) {
   const text = (k: string, standard: string) => (typeof options[k] === 'string' && (options[k] as string).trim() !== '' ? (options[k] as string).trim() : standard)
   DATEN = text('daten_repo', STANDARD.datenRepo)
-  const name = text('name', STANDARD.name)
-  AUTOR = ['-c', `user.name=${name}`, '-c', `user.email=${text('email', STANDARD.email)}`]
-  VORNAME = name.split(/\s+/)[0] ?? name
+  // Die Voreinstellungen für Name und E-Mail gelten nur zusammen mit dem voreingestellten Repo.
+  // Wer ein eigenes Repo einträgt und ein Feld leer lässt, schreibt mit der eigenen Git-Identität des Rechners.
+  const eigenes = DATEN !== STANDARD.datenRepo
+  const name = text('name', eigenes ? '' : STANDARD.name)
+  const email = text('email', eigenes ? '' : STANDARD.email)
+  AUTOR = [...(name !== '' ? ['-c', `user.name=${name}`] : []), ...(email !== '' ? ['-c', `user.email=${email}`] : [])]
+  VORNAME = name === '' ? 'die Person' : (name.split(/\s+/)[0] ?? name)
   REGELN = regeln(VORNAME)
 }
 
@@ -289,7 +293,7 @@ async function hinzufuegen(
             id,
             text: e.text.trim(),
             isDone: false,
-            ...(e.chat !== undefined && e.chat.startsWith('https://') ? { chat: e.chat } : {}),
+            ...(e.chat !== undefined && CHAT.test(e.chat) ? { chat: e.chat } : {}),
             ...(sitzung !== undefined ? { sitzung } : {}),
             erstellt: tag,
           })
@@ -460,8 +464,8 @@ export const register: Register = (on, options) => {
       projekt: input.projekt,
       punkte: input.punkte.map(p => {
         const vorher = alt?.punkte.find(a => a.id === p.id)
-        // Nur echte Web-Links übernehmen (wie bei punkte_hinzufuegen); sonst bleibt der alte
-        const chat = p.chat !== undefined && p.chat.startsWith('https://') ? p.chat : vorher?.chat
+        // Nur Adressen echter Claude-Chats übernehmen (wie bei punkte_hinzufuegen); sonst bleibt der alte
+        const chat = p.chat !== undefined && CHAT.test(p.chat) ? p.chat : vorher?.chat
         const isDone = p.isDone ?? vorher?.isDone ?? false
         const anders = vorher === undefined || vorher.text !== p.text || vorher.isDone !== isDone
         return {
@@ -608,7 +612,7 @@ export const register: Register = (on, options) => {
                 return (
                   <Box flexDirection="column">
                     <Text>{alt ? '(alt?) ' : ''}{p.text}</Text>
-                    {p.chat !== undefined && p.chat.startsWith('https://') && <Link href={p.chat}>Zum Chat</Link>}
+                    {chatId !== undefined && <Link href={`https://claude.ai/chat/${chatId}`}>Zum Chat</Link>}
                     <Box flexDirection="row" gap={1}>
                       <Button
                         key={`done-${l.slug}-${p.id}`}

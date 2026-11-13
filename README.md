@@ -53,7 +53,7 @@ Jede Person nutzt ihr eigenes privates Daten-Repo; den Code teilt man sich.
    - **Name**: mit dem Vornamen spricht Claude dich an; der ganze Name steht als Autor der Änderungen
    - **E-Mail für Git**: z. B. die anonyme GitHub-Adresse `…@users.noreply.github.com`
 
-   Voreingestellt sind Timos Werte. Bitte alle drei ändern, sonst versucht die Mod, Timos Repo zu lesen (das scheitert ohne Zugriff).
+   Das Daten-Repo muss eingetragen werden; bleibt es leer, versucht die Mod, das Repo des Autors zu lesen (das scheitert ohne Zugriff). Bleiben Name oder E-Mail leer, gilt die Git-Identität des eigenen Rechners.
 5. Die Mod legt die lokale Kopie in einem eigenen Ordner an (`~/.claude/openpoints-daten-<name>-<repo>`).
 
 ## Updates
