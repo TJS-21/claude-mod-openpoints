@@ -1,6 +1,9 @@
 export type Punkt = {
   id: string
+  /** Kurzer Titel */
   text: string
+  /** 1–3 Sätze: worum es geht, nächster Schritt, Anlass (sichtbar nach dem Aufklappen) */
+  kontext?: string
   isDone: boolean
   chat?: string
   /** Datum (JJJJ-MM-TT), an dem der Punkt in die Liste kam. */

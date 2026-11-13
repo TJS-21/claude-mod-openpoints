@@ -20,6 +20,9 @@ let AUTOR = ['-c', `user.name=${STANDARD.name}`, '-c', `user.email=${STANDARD.em
 let VORNAME = 'Timo'
 let REGELN = regeln(VORNAME)
 const SLUG = /^[a-z0-9][a-z0-9-]*$/
+// Pfeile der Seitenleiste; bewusst die größeren Dreiecke (▾/▸ wirkten zu klein), keine Emoji-Zeichen
+const PFEIL_ZU = '►'
+const PFEIL_AUF = '▼'
 const CHAT = /^https:\/\/claude\.ai\/chat\/([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})$/
 
 // Aufräumregeln
@@ -48,8 +51,8 @@ async function leisteZu($: EngineInterface) {
   await update($, offen, () => false)
 }
 
-type Eingabe = { slug: string; projekt: string; punkte: Array<{ id: string; text: string; isDone?: boolean; chat?: string }> }
-type Neu = { slug: string; projekt: string; text: string; chat?: string }
+type Eingabe = { slug: string; projekt: string; punkte: Array<{ id: string; text: string; kontext?: string; isDone?: boolean; chat?: string }> }
+type Neu = { slug: string; projekt: string; text: string; kontext?: string; chat?: string }
 type Verweis = { slug: string; id: string }
 
 // Feste Regel im Systemprompt. Bewusst ohne die Listen selbst, damit der Prompt-Cache stabil bleibt.
@@ -58,7 +61,7 @@ function regeln(vorname: string): string {
   return [
     `Offene Punkte (Mod openpoints): ${vorname} führt projektübergreifend eine Liste offener Punkte.`,
     `Nennt deine Antwort Aufgaben oder Entscheidungen, die ${vorname} selbst erledigen muss und die nicht in dieser Antwort erledigt werden, oder wird etwas vertagt („später“, „vertagen wir“, „machen wir morgen“), dann frag am Ende kurz, ob du sie auf die Liste setzen sollst, mit Wortlaut und Projekt.`,
-    `Trag erst nach dem OK von ${vorname} mit \`punkte_hinzufuegen\` ein. Nur eigene To-dos und offene Entscheidungen von ${vorname}, keine Alternativen zur Auswahl, nichts, was du gleich selbst erledigst, keine Rückfragen, die gerade beantwortet werden. Teilschritte zu einem Punkt zusammenfassen, kurz und auf Deutsch.`,
+    `Trag erst nach dem OK von ${vorname} mit \`punkte_hinzufuegen\` ein. Nur eigene To-dos und offene Entscheidungen von ${vorname}, keine Alternativen zur Auswahl, nichts, was du gleich selbst erledigst, keine Rückfragen, die gerade beantwortet werden. Teilschritte zu einem Punkt zusammenfassen, auf Deutsch. Jeder Punkt hat einen kurzen Titel (\`text\`, höchstens etwa 6 Wörter) und einen \`kontext\` in 1–3 Sätzen: worum es geht, was der nächste Schritt ist und woher der Punkt kommt (Projekt, Anlass), so dass ${vorname} auch nach Tagen ohne den Chat weiß, wo es weitergeht.`,
     'Projekt: ein vorhandenes Projekt, wenn es passt (das Ergebnis jedes Aufrufs nennt sie), sonst slug `allgemein`, Projekt „Allgemein“.',
     'Wird ein Punkt der Liste im Gespräch erledigt, hak ihn mit `punkte_erledigt` ab und erwähne das in einem Halbsatz.',
     `Punkte mit dem Feld \`veraltet\` hat ${vorname} als nicht mehr passend markiert. Kommt das Thema im Gespräch dran, kläre mit ${vorname}, ob der Punkt gestrichen, angepasst oder wieder offen sein soll, und trag das Ergebnis mit \`punkte_klaeren\` ein; nicht eigenmächtig.`,
@@ -306,6 +309,7 @@ async function hinzufuegen(
           neue.push({
             id,
             text: e.text.trim(),
+            ...(e.kontext !== undefined && e.kontext.trim() !== '' ? { kontext: e.kontext.trim() } : {}),
             isDone: false,
             ...(e.chat !== undefined && CHAT.test(e.chat) ? { chat: e.chat } : {}),
             ...(sitzung !== undefined ? { sitzung } : {}),
@@ -388,7 +392,8 @@ export const register: Register = (on, options) => {
               type: 'object',
               properties: {
                 id: { type: 'string' },
-                text: { type: 'string' },
+                text: { type: 'string', description: 'Kurzer Titel, höchstens etwa 6 Wörter' },
+                kontext: { type: 'string', description: '1–3 Sätze: worum es geht, nächster Schritt, Anlass' },
                 isDone: { type: 'boolean' },
                 chat: { type: 'string', description: 'Link zum Chat, in dem der Punkt entstanden ist (https://claude.ai/chat/…)' },
               },
@@ -415,7 +420,8 @@ export const register: Register = (on, options) => {
               properties: {
                 slug: { type: 'string', pattern: SLUG.source },
                 projekt: { type: 'string' },
-                text: { type: 'string' },
+                text: { type: 'string', description: 'Kurzer Titel, höchstens etwa 6 Wörter' },
+                kontext: { type: 'string', description: '1–3 Sätze: worum es geht, nächster Schritt, Anlass' },
                 chat: { type: 'string', description: 'Link zum Chat, falls bekannt (https://claude.ai/chat/…)' },
               },
               required: ['slug', 'projekt', 'text'],
@@ -493,6 +499,7 @@ export const register: Register = (on, options) => {
           ...(vorher ?? {}),
           id: p.id,
           text: p.text,
+          ...(p.kontext !== undefined && p.kontext.trim() !== '' ? { kontext: p.kontext.trim() } : {}),
           isDone,
           ...(chat !== undefined ? { chat } : {}),
           ...(anders && vorher !== undefined ? { geaendert: tag } : {}),
@@ -642,18 +649,21 @@ export const register: Register = (on, options) => {
     const veraltetAuf = offeneBereiche.includes('veraltet')
     const erledigtAuf = offeneBereiche.includes('erledigt')
 
+    // Pfeil zum Auf- und Zuklappen, rechts in der Zeile: ► zu, ▼ offen
+    const pfeil = (key: string, istZu: boolean, run: () => void) =>
+      alsLinks ? (
+        <Markdown key={key} text={`[${istZu ? PFEIL_ZU : PFEIL_AUF}](${ziel}#${key})`} pressableLinks={[`${ziel}#${key}`]} onLinkPress={run} />
+      ) : (
+        <Button key={key} onPress={run}>
+          {istZu ? PFEIL_ZU : PFEIL_AUF}
+        </Button>
+      )
     const kopf = (key: string, titel: string, n: number, istZu: boolean, run: () => void, grau: boolean) => (
       <Box key={key} flexDirection="row" alignItems="center" justifyContent="space-between" gap={1} {...(grau ? { backgroundColor: '#3A3A3C', paddingX: 1 } : {})}>
         <Text {...(grau ? {} : { dimColor: true, size: 'caption' as const })}>
           {titel} <Text dimColor>{grau ? n : `(${n})`}</Text>
         </Text>
-        {alsLinks ? (
-          <Markdown key={`${key}-link`} text={`[${istZu ? 'Aufklappen' : 'Zuklappen'}](${ziel}#${key})`} pressableLinks={[`${ziel}#${key}`]} onLinkPress={run} />
-        ) : (
-          <Button key={`${key}-link`} onPress={run}>
-            {istZu ? 'Aufklappen' : 'Zuklappen'}
-          </Button>
-        )}
+        {pfeil(`${key}-link`, istZu, run)}
       </Box>
     )
 
@@ -688,12 +698,19 @@ export const register: Register = (on, options) => {
                     ? [{ key: `ask-${l.slug}-${p.id}`, label: 'Frage dazu', run: () => void frageEinfuegen($, `Frage zu „${p.text}“ (${l.projekt}): Wie gehe ich da genau vor?`) }]
                     : []),
                 ]
+                // Zugeklappt nur der Titel; aufgeklappt Kontext und Links
+                const bereich = `punkt:${l.slug}:${p.id}`
+                const istAuf = offeneBereiche.includes(bereich)
                 return (
                   <Box key={`punkt-${l.slug}-${p.id}`} flexDirection="column">
-                    <Text>{alt ? '(alt?) ' : ''}{p.text}</Text>
-                    {aktionen(`akt-${l.slug}-${p.id}`, liste)}
+                    <Box key={`titel-${l.slug}-${p.id}`} flexDirection="row" alignItems="flex-start" justifyContent="space-between" gap={1}>
+                      <Text>{alt ? '(alt?) ' : ''}{p.text}</Text>
+                      {pfeil(`pt-${l.slug}-${p.id}`, !istAuf, umschalten(bereich, istAuf))}
+                    </Box>
+                    {istAuf && p.kontext !== undefined && <Text dimColor>{p.kontext}</Text>}
+                    {istAuf && aktionen(`akt-${l.slug}-${p.id}`, liste)}
                     {/* Web-Link zum Chat: auf dem Handy und im Terminal; in der App steckt er in „Zum Chat“ */}
-                    {chatUrl !== undefined && (!alsLinks || !inApp) && <Link href={chatUrl}>Zum Chat</Link>}
+                    {istAuf && chatUrl !== undefined && (!alsLinks || !inApp) && <Link href={chatUrl}>Zum Chat</Link>}
                   </Box>
                 )
               })}

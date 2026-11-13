@@ -4,7 +4,7 @@ Eine Claude-Code-Mod: offene Aufgaben je Projekt, die sich selbst füllen.
 
 ## Anzeige
 - **Band über dem Eingabefeld**: schmaler grauer Streifen „Offene Punkte: Projekt 4“, ganz rechts der Link **Öffnen** bzw. **Einklappen**, je nachdem, ob das Panel offen ist (im Terminal ein Knopf). Andere Bänder (z. B. die Nutzungsleiste) bleiben darunter sichtbar.
-- **Panel** (öffnet sich beim Start von selbst, sonst `/offene-punkte`): oben die Zahl offener Punkte, die Uhrzeit des letzten Abgleichs und **Aktualisieren**; je Projekt ein schmaler grauer Streifen mit **Zuklappen**; je Punkt der Text und darunter kleine Links **Erledigt · Veraltet · Zum Chat · Frage dazu**. Veraltete und erledigte Punkte stehen ganz unten, zugeklappt. Im Terminal sind die Links Knöpfe.
+- **Panel** (öffnet sich beim Start von selbst, sonst `/offene-punkte`): oben die Zahl offener Punkte, die Uhrzeit des letzten Abgleichs und **Aktualisieren**; je Projekt ein schmaler grauer Streifen; je Punkt ein kurzer Titel. Ein Pfeil rechts (► / ▼) klappt auf: darunter der Kontext (worum es geht, nächster Schritt, Anlass) und kleine Links **Erledigt · Veraltet · Zum Chat · Frage dazu**. Veraltete und erledigte Punkte stehen ganz unten, zugeklappt. Im Terminal sind die Links Knöpfe.
 - Klicks in der Leiste ändern nur die Liste und schreiben **nichts in den laufenden Chat**; oben zeigt eine Zeile, was passiert ist („Abgehakt: …“).
   - **Erledigt** hakt ab (mit **Zurück**, 14 Tage sichtbar).
   - **Zum Chat** öffnet den Ursprungs-Chat in der Claude-App auf dem Mac; auf dem Handy gibt es nur den Web-Link.
@@ -13,7 +13,7 @@ Eine Claude-Code-Mod: offene Aufgaben je Projekt, die sich selbst füllen.
 - Offene Punkte, die 30 Tage niemand angefasst hat, bekommen „(alt?)“.
 
 ## Punkte entstehen im Chat
-- Nennt eine Antwort Aufgaben für dich oder wird etwas vertagt, fragt Claude am Ende kurz, ob es die Punkte auf die Liste setzen soll (mit Wortlaut und Projekt). Eingetragen wird erst nach deinem OK (`punkte_hinzufuegen`); so entscheidest du mit dem vollen Zusammenhang des Chats.
+- Nennt eine Antwort Aufgaben für dich oder wird etwas vertagt, fragt Claude am Ende kurz, ob es die Punkte auf die Liste setzen soll (mit Wortlaut und Projekt). Jeder Punkt bekommt einen kurzen Titel und einen Kontext in 1–3 Sätzen, damit man auch nach Tagen weiß, wo es weitergeht. Eingetragen wird erst nach deinem OK (`punkte_hinzufuegen`); so entscheidest du mit dem vollen Zusammenhang des Chats.
 - Erledigtes hakt Claude im Gespräch ab (`punkte_erledigt`), veraltete Punkte klärt es mit dir (`punkte_klaeren`).
 - Was in kein Projekt passt, kommt nach „Allgemein“.
 - Ohne Oberfläche (`claude -p`, etwa aus n8n) gilt die Regel nicht. Aufrufe über die Claude-API laufen gar nicht durch Claude Code.

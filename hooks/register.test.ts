@@ -211,6 +211,16 @@ async function klick(ui: { find: (q: never) => Promise<unknown>; press: (t: neve
   return ui.press({ key } as never)
 }
 
+// Alle Punkte aufklappen (zugeklappt zeigen sie nur den Titel)
+async function alleAuf(ui: { findAll: (q: never) => Promise<unknown[]>; find: (q: never) => Promise<unknown>; press: (t: never) => Promise<unknown> }) {
+  for (const typ of ['Markdown', 'Button']) {
+    for (const el of await ui.findAll({ type: typ } as never)) {
+      const key = (el as { key?: string }).key ?? ''
+      if (key.startsWith('pt-')) await klick(ui, key)
+    }
+  }
+}
+
 test('Erledigtes verschwindet nach 14 Tagen, Unberührtes bekommt nach 30 Tagen „alt?“', async ($, on) => {
   attrappe(on, {
     punkte: [
@@ -222,6 +232,7 @@ test('Erledigtes verschwindet nach 14 Tagen, Unberührtes bekommt nach 30 Tagen 
   })
   await $.tool.call({ tool: SETZEN, slug: 'web', projekt: 'Web', punkte: [{ id: 'frisch', text: 'Frisch erledigt' }, { id: 'lange', text: 'Lange erledigt' }, { id: 'alt', text: 'Liegt herum' }, { id: 'jung', text: 'Ganz neu' }] } as never)
   const ui = await $.ui.mount({ ...PANE, surface: 'desktop' } as never)
+  await alleAuf(ui)
   // Erledigtes ist zugeklappt
   expect(await finde(ui, 'undo-web-frisch')).toBeUndefined()
   await klick(ui, 'bereich-erledigt-link')
@@ -235,9 +246,10 @@ test('Aufbau in der App: grauer Streifen je Projekt, kleine Links statt Knöpfe,
   attrappe(on, { punkte: [{ id: 'a', text: 'Offen', isDone: false, chat: `https://claude.ai/chat/${UUID}`, sitzung: 'sitzung-1' }] })
   await $.tool.call({ tool: SETZEN, slug: 'web', projekt: 'Web', punkte: [{ id: 'a', text: 'Offen' }] } as never)
   const ui = await $.ui.mount({ ...PANE, surface: 'desktop' } as never)
+  await alleAuf(ui)
   expect(await ui.findAll({ type: 'Button' } as never)).toEqual([])
   const links = (await ui.findAll({ type: 'Markdown' } as never)).map(m => (m as { key?: string }).key)
-  expect(links).toEqual(['reload', 'fold-web-link', 'done-web-a', 'stale-web-a', 'chat-web-a', 'ask-web-a'])
+  expect(links).toEqual(['reload', 'fold-web-link', 'pt-web-a', 'done-web-a', 'stale-web-a', 'chat-web-a', 'ask-web-a'])
   // „Zum Chat“ zeigt auf den echten Chat (Browser, falls die App den Klick nicht weitergibt)
   expect(JSON.stringify(await ui.find({ type: 'Markdown', key: 'chat-web-a' } as never))).toContain(`https://claude.ai/chat/${UUID}`)
   expect(await ui.find({ type: 'Link', text: 'Zum Chat' })).toBeUndefined()
@@ -250,8 +262,9 @@ test('Aufbau im Terminal: Knöpfe und Web-Link', async ($, on) => {
   attrappe(on, { punkte: [{ id: 'a', text: 'Offen', isDone: false, chat: `https://claude.ai/chat/${UUID}`, sitzung: 'sitzung-1' }] })
   await $.tool.call({ tool: SETZEN, slug: 'web', projekt: 'Web', punkte: [{ id: 'a', text: 'Offen' }] } as never)
   const ui = await $.ui.mount({ ...PANE, surface: 'terminal' } as never)
+  await alleAuf(ui)
   const knoepfe = (await ui.findAll({ type: 'Button' })).map(b => b.key)
-  expect(knoepfe.filter(k => k?.endsWith('-web-a'))).toEqual(['done-web-a', 'stale-web-a', 'chat-web-a', 'ask-web-a'])
+  expect(knoepfe.filter(k => k?.endsWith('-web-a'))).toEqual(['pt-web-a', 'done-web-a', 'stale-web-a', 'chat-web-a', 'ask-web-a'])
   expect(await ui.find({ type: 'Link', text: 'Zum Chat' })).toBeDefined()
   await ui.unmount()
 })
@@ -261,6 +274,7 @@ for (const surface of ['desktop', 'terminal'] as const) {
     const a = attrappe(on, { punkte: [{ id: 'a', text: 'Offen', isDone: false }] })
     await $.tool.call({ tool: SETZEN, slug: 'web', projekt: 'Web', punkte: [{ id: 'a', text: 'Offen' }] } as never)
     const ui = await $.ui.mount({ ...PANE, surface } as never)
+    await alleAuf(ui)
     await klick(ui, 'done-web-a')
     expect(a.prompts).toEqual([])
     expect(a.liste().punkte[0]?.isDone).toBe(true)
@@ -277,6 +291,7 @@ for (const surface of ['desktop', 'terminal'] as const) {
     const a = attrappe(on, { punkte: [{ id: 'a', text: 'Offen', isDone: false, chat: `https://claude.ai/chat/${UUID}` }] })
     await $.tool.call({ tool: SETZEN, slug: 'web', projekt: 'Web', punkte: [{ id: 'a', text: 'Offen' }] } as never)
     const ui = await $.ui.mount({ ...PANE, surface } as never)
+    await alleAuf(ui)
     await klick(ui, 'chat-web-a')
     expect(a.geoeffnet).toEqual([['open', `claude://claude.ai/chat/${UUID}`]])
     expect(a.prompts).toEqual([])
@@ -286,6 +301,7 @@ for (const surface of ['desktop', 'terminal'] as const) {
     const a = attrappe(on, { punkte: [{ id: 'a', text: 'Offen', isDone: false }, { id: 'b', text: 'Zweiter', isDone: false }] })
     await $.tool.call({ tool: SETZEN, slug: 'web', projekt: 'Web', punkte: [{ id: 'a', text: 'Offen' }, { id: 'b', text: 'Zweiter' }] } as never)
     const ui = await $.ui.mount({ ...PANE, surface } as never)
+    await alleAuf(ui)
     await klick(ui, 'stale-web-a')
     expect(a.prompts).toEqual([])
     expect(a.liste().punkte[0]?.veraltet).toBe(HEUTE)
@@ -313,6 +329,7 @@ for (const surface of ['desktop', 'terminal'] as const) {
     })
     await $.tool.call({ tool: SETZEN, slug: 'web', projekt: 'Web', punkte: [{ id: 'a', text: 'Von hier' }, { id: 'b', text: 'Von woanders' }, { id: 'c', text: 'Aus claude.ai' }] } as never)
     const ui = await $.ui.mount({ ...PANE, surface } as never)
+    await alleAuf(ui)
     expect(await finde(ui, 'ask-web-a')).toBeDefined()
     expect(await finde(ui, 'ask-web-b')).toBeUndefined()
     expect(await finde(ui, 'ask-web-c')).toBeUndefined()
@@ -327,10 +344,11 @@ test('Projekt zuklappen und aufklappen', async ($, on) => {
   attrappe(on, { punkte: [{ id: 'a', text: 'Offen', isDone: false }] })
   await $.tool.call({ tool: SETZEN, slug: 'web', projekt: 'Web', punkte: [{ id: 'a', text: 'Offen' }] } as never)
   const ui = await $.ui.mount({ ...PANE, surface: 'desktop' } as never)
-  expect(JSON.stringify(await ui.find({ type: 'Markdown', key: 'fold-web-link' } as never))).toContain('[Zuklappen]')
+  await alleAuf(ui)
+  expect(JSON.stringify(await ui.find({ type: 'Markdown', key: 'fold-web-link' } as never))).toContain('[▼]')
   await klick(ui, 'fold-web-link')
   expect(await finde(ui, 'done-web-a')).toBeUndefined()
-  expect(JSON.stringify(await ui.find({ type: 'Markdown', key: 'fold-web-link' } as never))).toContain('[Aufklappen]')
+  expect(JSON.stringify(await ui.find({ type: 'Markdown', key: 'fold-web-link' } as never))).toContain('[►]')
   await klick(ui, 'fold-web-link')
   expect(await finde(ui, 'done-web-a')).toBeDefined()
 })
@@ -339,6 +357,7 @@ test('auf dem Handy gibt es nur den Web-Link, keinen App-Knopf', async ($, on) =
   attrappe(on, { punkte: [{ id: 'a', text: 'Offen', isDone: false, chat: `https://claude.ai/chat/${UUID}` }] })
   await $.tool.call({ tool: SETZEN, slug: 'web', projekt: 'Web', punkte: [{ id: 'a', text: 'Offen' }] } as never)
   const ui = await $.ui.mount({ ...PANE, surface: 'mobile' } as never)
+  await alleAuf(ui)
   expect(await finde(ui, 'chat-web-a')).toBeUndefined()
   expect(await ui.find({ type: 'Link', text: 'Zum Chat' })).toBeDefined()
 })
@@ -347,6 +366,7 @@ test('ohne gültigen Chat-Link weder App-Knopf noch Web-Link', async ($, on) => 
   attrappe(on, { punkte: [{ id: 'a', text: 'Offen', isDone: false, chat: 'https://example.com/x' }] })
   await $.tool.call({ tool: SETZEN, slug: 'web', projekt: 'Web', punkte: [{ id: 'a', text: 'Offen' }] } as never)
   const ui = await $.ui.mount({ ...PANE, surface: 'desktop' } as never)
+  await alleAuf(ui)
   expect(await finde(ui, 'chat-web-a')).toBeUndefined()
   expect(await ui.find({ type: 'Link', text: 'Zum Chat' })).toBeUndefined()
 })
@@ -493,4 +513,33 @@ test('eigenes Repo ohne Name und E-Mail: kein fremder Autor, eigene Git-Identit�
   const commit = a.aufrufe.find(x => x.includes('commit')) ?? []
   expect(commit.slice(0, 4)).toEqual(['git', '-C', ANNA_DIR, 'commit'])
   expect(a.aufrufe.some(x => x.some(t => t.includes('TJS-21') || t.includes('Timo')))).toBe(false)
+})
+
+test('Punkt zugeklappt: nur Titel und Pfeil rechts; aufgeklappt Kontext und Links', async ($, on) => {
+  attrappe(on, { punkte: [{ id: 'a', text: 'Commits hochladen?', kontext: 'Vier Commits liegen nur lokal. Entscheiden, ob sie zu GitHub sollen.', isDone: false }] })
+  await $.tool.call({ tool: SETZEN, slug: 'web', projekt: 'Web', punkte: [{ id: 'a', text: 'Commits hochladen?' }] } as never)
+  const ui = await $.ui.mount({ ...PANE, surface: 'desktop' } as never)
+  expect(await ui.find({ type: 'Text', text: 'Commits hochladen?' })).toBeDefined()
+  expect(await ui.find({ type: 'Text', text: /Vier Commits/ })).toBeUndefined()
+  expect(await finde(ui, 'done-web-a')).toBeUndefined()
+  expect(JSON.stringify(await ui.find({ type: 'Markdown', key: 'pt-web-a' } as never))).toContain('[►]')
+  await klick(ui, 'pt-web-a')
+  expect(await ui.find({ type: 'Text', text: /Vier Commits/ })).toBeDefined()
+  expect(await finde(ui, 'done-web-a')).toBeDefined()
+  expect(JSON.stringify(await ui.find({ type: 'Markdown', key: 'pt-web-a' } as never))).toContain('[▼]')
+})
+
+test('punkte_hinzufuegen speichert Titel und Kontext', async ($, on) => {
+  const a = attrappe(on)
+  await $.tool.call({ tool: HINZU, punkte: [{ slug: 'web', projekt: 'Web', text: 'Sitemap umstellen', kontext: '  Beim Launch in Search Console und Bing auf sitemap-index.xml umstellen.  ' }] } as never)
+  const p = a.liste().punkte.find(x => x.text === 'Sitemap umstellen')
+  expect(p?.kontext).toBe('Beim Launch in Search Console und Bing auf sitemap-index.xml umstellen.')
+})
+
+test('die Regel verlangt kurzen Titel und Kontext', async ($, on) => {
+  on('prompt.compose', async () => ({ sections: [] }) as never)
+  const r = await $.prompt.compose({ ...COMPOSE, surfaces: ['desktop'] } as never)
+  const regel = r.sections.find(s => s.id === 'openpoints:regeln')?.text ?? ''
+  expect(regel).toContain('kurzen Titel')
+  expect(regel).toContain('`kontext`')
 })
