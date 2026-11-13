@@ -16,6 +16,8 @@ export type Punkt = {
   veraltet?: string
   /** Claude-Code-Sitzung, in der der Punkt entstand; nur dort gibt es „Frage dazu“. */
   sitzung?: string
+  /** Sitzung der Desktop-App (local_…), in der der Punkt entstand; für den Link „Zur Sitzung“. */
+  sitzungApp?: string
 }
 export type Liste = { slug: string; projekt: string; punkte: Punkt[] }
 

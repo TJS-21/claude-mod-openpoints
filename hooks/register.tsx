@@ -23,6 +23,8 @@ const SLUG = /^[a-z0-9][a-z0-9-]*$/
 // Zeichen zum Auf- und Zuklappen: zugeklappt ein mittelgroßes Dreieck nach unten (wie bei einem Drop-down), aufgeklappt ein Minus
 const PFEIL_ZU = '⏷'
 const PFEIL_AUF = '−'
+// Kennung einer Sitzung der Desktop-App (für den Link „Zur Sitzung“)
+const APP_SITZUNG = /^local_[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/
 const CHAT = /^https:\/\/claude\.ai\/chat\/([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})$/
 
 // Aufräumregeln
@@ -280,6 +282,7 @@ async function hinzufuegen(
   $: EngineInterface,
   eintraege: Neu[],
   sitzung?: string,
+  sitzungApp?: string,
 ): Promise<{ dazu: number; doppelt: number; fehler: string }> {
   let dazu = 0
   let doppelt = 0
@@ -313,6 +316,7 @@ async function hinzufuegen(
             isDone: false,
             ...(e.chat !== undefined && CHAT.test(e.chat) ? { chat: e.chat } : {}),
             ...(sitzung !== undefined ? { sitzung } : {}),
+            ...(sitzungApp !== undefined ? { sitzungApp } : {}),
             erstellt: tag,
           })
         }
@@ -356,6 +360,23 @@ function projekteText(alle: Liste[]): string {
 }
 
 // Öffnet den Chat in der Claude-App auf dem Mac statt im Browser.
+// Die Sitzung der Desktop-App, in der diese Mod gerade läuft; leer im Terminal und ohne App
+async function appSitzung($: EngineInterface): Promise<string | undefined> {
+  try {
+    const { stdout } = await $.process.run(['sh', '-c', 'printf %s "$CLAUDE_CODE_HOST_SESSION_ID"'])
+    return APP_SITZUNG.test(stdout) ? stdout : undefined
+  } catch {
+    return undefined
+  }
+}
+
+// Öffnet die Sitzung, in der der Punkt entstand, in der Desktop-App
+async function zurSitzung($: EngineInterface, id: string) {
+  if (!APP_SITZUNG.test(id)) return
+  const r = await $.process.run(['open', `claude://claude.ai/epitaxy/${id}`])
+  if (r.exitCode !== 0) await update($, meldung, () => 'Sitzung konnte nicht in der App geöffnet werden.')
+}
+
 async function zumChat($: EngineInterface, id: string) {
   const r = await $.process.run(['open', `claude://claude.ai/chat/${id}`])
   if (r.exitCode !== 0) await update($, meldung, () => 'Chat konnte nicht in der App geöffnet werden.')
@@ -486,6 +507,7 @@ export const register: Register = (on, options) => {
     const input = e as unknown as Eingabe
     if (!SLUG.test(input.slug)) return { deny: `Ungültiger slug „${input.slug}“: nur Kleinbuchstaben, Ziffern und Bindestriche.` }
     const sitzung = await $.session.id()
+    const sitzungApp = await appSitzung($)
     const neu = (alt: Liste | undefined, tag: string): Liste => ({
       slug: input.slug,
       projekt: input.projekt,
@@ -504,6 +526,7 @@ export const register: Register = (on, options) => {
           ...(chat !== undefined ? { chat } : {}),
           ...(anders && vorher !== undefined ? { geaendert: tag } : {}),
           ...(vorher === undefined ? { sitzung } : {}),
+          ...(vorher === undefined && sitzungApp !== undefined ? { sitzungApp } : {}),
           ...(isDone && vorher?.isDone !== true ? { erledigtAm: tag } : {}),
         }
       }),
@@ -520,7 +543,7 @@ export const register: Register = (on, options) => {
     const input = e as unknown as { punkte: Neu[] }
     const falsch = input.punkte.find(p => !SLUG.test(p.slug))
     if (falsch) return { deny: `Ungültiger slug „${falsch.slug}“: nur Kleinbuchstaben, Ziffern und Bindestriche.` }
-    const r = await hinzufuegen($, input.punkte, await $.session.id())
+    const r = await hinzufuegen($, input.punkte, await $.session.id(), await appSitzung($))
     const projekte = projekteText(await read($, listen))
     const teile = [`${r.dazu} eingetragen`, ...(r.doppelt > 0 ? [`${r.doppelt} schon vorhanden`] : []), ...(r.fehler !== '' ? [r.fehler] : [])]
     return { result: `${teile.join(', ')}. Projekte: ${projekte}.` }
@@ -698,6 +721,10 @@ export const register: Register = (on, options) => {
                   // In der App öffnet „Zum Chat“ den Chat in der Claude-App; sonst im Browser
                   ...(alsLinks && inApp && chatId !== undefined && chatUrl !== undefined ? [{ key: `chat-${l.slug}-${p.id}`, label: 'Zum Chat', href: chatUrl, run: () => void zumChat($, chatId) }] : []),
                   ...(!alsLinks && inApp && chatId !== undefined ? [{ key: `chat-${l.slug}-${p.id}`, label: 'Zum Chat', run: () => void zumChat($, chatId) }] : []),
+                  // „Zur Sitzung“ öffnet die Sitzung der Desktop-App, in der der Punkt entstand (nicht am Handy)
+                  ...(inApp && p.sitzungApp !== undefined && APP_SITZUNG.test(p.sitzungApp)
+                    ? [{ key: `sitzung-${l.slug}-${p.id}`, label: 'Zur Sitzung', run: () => void zurSitzung($, p.sitzungApp ?? '') }]
+                    : []),
                   ...(p.sitzung !== undefined && p.sitzung === sitzung
                     ? [{ key: `ask-${l.slug}-${p.id}`, label: 'Frage dazu', run: () => void frageEinfuegen($, `Frage zu „${p.text}“ (${l.projekt}): Wie gehe ich da genau vor?`) }]
                     : []),

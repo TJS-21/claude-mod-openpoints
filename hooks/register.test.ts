@@ -10,7 +10,7 @@ const UUID = '0a1b2c3d-1234-4abc-8def-0123456789ab'
 const HEUTE = '2026-10-20'
 const PANE = { plugin: 'openpoints', component: 'Pane', requestId: 'openpoints', props: { id: 'openpoints', title: 'Offene Punkte' } } as const
 
-type Opts = { pullFehler?: boolean; pushFehler?: number; unveraendert?: boolean; modell?: string; punkte?: unknown[]; flaechen?: string[]; sitzung?: string; dir?: string; ohneKlon?: boolean }
+type Opts = { pullFehler?: boolean; pushFehler?: number; unveraendert?: boolean; modell?: string; punkte?: unknown[]; flaechen?: string[]; sitzung?: string; dir?: string; ohneKlon?: boolean; appSitzung?: string }
 
 // Ersetzt Dateisystem, Git, Uhr, Oberflächen und Modell: nichts im Test erreicht die Platte, GitHub oder die API.
 function attrappe(on: On, opts: Opts = {}) {
@@ -42,7 +42,7 @@ function attrappe(on: On, opts: Opts = {}) {
   })
   on('process.run', async (_$, e) => {
     aufrufe.push([...e.argv])
-    if (e.argv[0] === 'sh') return { value: { exitCode: 0, stdout: '/home', stderr: '' } } as never
+    if (e.argv[0] === 'sh') return { value: { exitCode: 0, stdout: (e.argv[2] ?? '').includes('HOST_SESSION') ? (opts.appSitzung ?? '') : '/home', stderr: '' } } as never
     if (e.argv[0] === 'mkdir' || (e.argv[0] === 'git' && e.argv[1] === 'clone')) return { value: { exitCode: 0, stdout: '', stderr: '' } } as never
     if (e.argv[0] === 'open') {
       geoeffnet.push([...e.argv])
@@ -542,4 +542,41 @@ test('die Regel verlangt kurzen Titel und Kontext', async ($, on) => {
   const regel = r.sections.find(s => s.id === 'openpoints:regeln')?.text ?? ''
   expect(regel).toContain('kurzen Titel')
   expect(regel).toContain('`kontext`')
+})
+
+const APP = 'local_4d7250e4-e7c1-4806-8fb2-b7ef4b4c5dcf'
+
+test('neue Punkte merken sich die Sitzung der App; „Zur Sitzung“ öffnet sie', async ($, on) => {
+  const a = attrappe(on, { appSitzung: APP })
+  await $.tool.call({ tool: HINZU, punkte: [{ slug: 'web', projekt: 'Web', text: 'Sitemap umstellen', kontext: 'Beim Launch.' }] } as never)
+  const p = a.liste().punkte.find(x => x.text === 'Sitemap umstellen')
+  expect(p?.sitzungApp).toBe(APP)
+  for (const surface of ['desktop', 'terminal'] as const) {
+    const ui = await $.ui.mount({ ...PANE, surface } as never)
+    // Aufgeklappt bleibt aufgeklappt: nur beim ersten Mal aufklappen
+    if (surface === 'desktop') await alleAuf(ui)
+    expect(await finde(ui, `sitzung-web-${p?.id}`)).toBeDefined()
+    await klick(ui, `sitzung-web-${p?.id}`)
+    await ui.unmount()
+  }
+  expect(a.geoeffnet).toEqual([['open', `claude://claude.ai/epitaxy/${APP}`], ['open', `claude://claude.ai/epitaxy/${APP}`]])
+  expect(a.prompts).toEqual([])
+})
+
+test('ohne App-Sitzung (Terminal) wird nichts gemerkt; am Handy kein „Zur Sitzung“', async ($, on) => {
+  const a = attrappe(on, { punkte: [{ id: 'x', text: 'Alt', isDone: false, sitzungApp: APP }] })
+  await $.tool.call({ tool: HINZU, punkte: [{ slug: 'web', projekt: 'Web', text: 'Neu ohne App' }] } as never)
+  expect(a.liste().punkte.find(x => x.text === 'Neu ohne App')?.sitzungApp).toBeUndefined()
+  const ui = await $.ui.mount({ ...PANE, surface: 'mobile' } as never)
+  await alleAuf(ui)
+  expect(await finde(ui, 'sitzung-web-x')).toBeUndefined()
+})
+
+test('eine unzulässige Sitzungskennung wird nicht geöffnet', async ($, on) => {
+  const a = attrappe(on, { punkte: [{ id: 'x', text: 'Alt', isDone: false, sitzungApp: 'local_x; rm -rf ~' }] })
+  await $.tool.call({ tool: SETZEN, slug: 'web', projekt: 'Web', punkte: [{ id: 'x', text: 'Alt' }] } as never)
+  const ui = await $.ui.mount({ ...PANE, surface: 'desktop' } as never)
+  await alleAuf(ui)
+  expect(await finde(ui, 'sitzung-web-x')).toBeUndefined()
+  expect(a.geoeffnet).toEqual([])
 })
