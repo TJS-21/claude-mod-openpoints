@@ -542,7 +542,8 @@ export const register: Register = (on, options) => {
     const istOffen = await read($, offen)
     const wort = istOffen ? 'Einklappen' : 'Öffnen'
     const oeffnen = () => void (istOffen ? leisteZu($) : leisteAuf($))
-    // Kleiner Text-Link statt Knopf (die App zeichnet Knöpfe in fester Größe).
+    // Kleiner Text-Link statt Knopf (die App zeichnet Knöpfe in fester Größe), auf schmalem grauem Streifen
+    // wie der eingeklappte Streifen der Nutzungsleiste.
     // Gibt die App den Klick nicht weiter, öffnet der Link das Listen-Repo im Browser.
     const ziel = DATEN.replace(/\.git$/, '')
     const knopf =
@@ -555,7 +556,7 @@ export const register: Register = (on, options) => {
       )
     return (
       <Box flexDirection="column">
-        <Box key="band-zeile" flexDirection="row" alignItems="center" gap={1}>
+        <Box key="band-zeile" flexDirection="row" alignItems="center" gap={1} backgroundColor="#3A3A3C" paddingX={1}>
           {knopf}
           <Text dimColor>
             Offene Punkte: {teile.map(x => `${x.projekt} ${x.n}`).join(' · ')}
