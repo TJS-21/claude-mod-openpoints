@@ -518,16 +518,26 @@ export const register: Register = (on, options) => {
     if (teile.length === 0) return next(e)
     // Was andere Mods hier zeichnen (z. B. die Nutzungsleiste), bleibt darunter stehen
     const below = await next(e)
-    const { Box, Text, Button } = $.ui.resolve(e)
+    const { Box, Text, Button, Markdown } = $.ui.resolve(e)
+    const oeffnen = () => void $.ui.open({ id: PANE, title: TITLE })
+    // Kleiner Text-Link statt Knopf (die App zeichnet Knöpfe in fester Größe).
+    // Gibt die App den Klick nicht weiter, öffnet der Link das Listen-Repo im Browser.
+    const ziel = DATEN.replace(/\.git$/, '')
+    const knopf =
+      e.surface === 'terminal' || !ziel.startsWith('https://') ? (
+        <Button key="band-oeffnen" onPress={oeffnen}>
+          Öffnen
+        </Button>
+      ) : (
+        <Markdown key="band-oeffnen" text={`[Öffnen](${ziel})`} pressableLinks={[ziel]} onLinkPress={oeffnen} />
+      )
     return (
       <Box flexDirection="column">
-        <Box key="band-zeile" flexDirection="row" gap={1}>
+        <Box key="band-zeile" flexDirection="row" alignItems="center" gap={1}>
+          {knopf}
           <Text dimColor>
             Offene Punkte: {teile.map(x => `${x.projekt} ${x.n}`).join(' · ')}
           </Text>
-          <Button key="band-oeffnen" onPress={() => void $.ui.open({ id: PANE, title: TITLE })}>
-            Öffnen
-          </Button>
         </Box>
         {below}
       </Box>

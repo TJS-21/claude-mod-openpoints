@@ -310,6 +310,17 @@ test('das Band zeigt die offenen Punkte und öffnet das Panel', async ($, on) =>
   const ui = await $.ui.mount({ plugin: 'openpoints', surface: 'desktop', component: 'AbovePrompt', props: { hasSurvey: false, isWorking: false, maxRows: 10 } } as never)
   expect(await ui.find({ type: 'Text', text: 'Offene Punkte: Web 2' })).toBeDefined()
   expect(await ui.find({ type: 'Text', text: /neu/ })).toBeUndefined()
+  // In der App ein kleiner Link, der das Panel öffnet
+  expect(await ui.find({ type: 'Button', key: 'band-oeffnen' })).toBeUndefined()
+  await ui.press({ key: 'band-oeffnen', link: { href: 'https://github.com/TJS-21/claude-openpoints-daten' } })
+  expect(a.panes).toContain('openpoints')
+})
+
+test('im Terminal bleibt Öffnen ein Knopf', async ($, on) => {
+  const a = attrappe(on, { punkte: [{ id: 'a', text: 'Eins', isDone: false }] })
+  await $.tool.call({ tool: SETZEN, slug: 'web', projekt: 'Web', punkte: [{ id: 'a', text: 'Eins' }] } as never)
+  const ui = await $.ui.mount({ plugin: 'openpoints', surface: 'terminal', component: 'AbovePrompt', props: { hasSurvey: false, isWorking: false, maxRows: 10 } } as never)
+  expect(await ui.find({ type: 'Button', key: 'band-oeffnen' })).toBeDefined()
   await ui.press({ key: 'band-oeffnen' })
   expect(a.panes).toContain('openpoints')
 })
