@@ -556,11 +556,12 @@ export const register: Register = (on, options) => {
       )
     return (
       <Box flexDirection="column">
-        <Box key="band-zeile" flexDirection="row" alignItems="center" gap={1} backgroundColor="#3A3A3C" paddingX={1}>
-          {knopf}
+        <Box key="band-zeile" flexDirection="row" alignItems="center" justifyContent="space-between" gap={1} backgroundColor="#3A3A3C" paddingX={1}>
           <Text dimColor>
             Offene Punkte: {teile.map(x => `${x.projekt} ${x.n}`).join(' · ')}
           </Text>
+          {/* Öffnen/Einklappen ganz rechts */}
+          {knopf}
         </Box>
         {below}
       </Box>
