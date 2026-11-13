@@ -516,15 +516,20 @@ export const register: Register = (on, options) => {
     const alle = await read($, listen)
     const teile = alle.map(l => ({ projekt: l.projekt, n: l.punkte.filter(p => !p.isDone && p.veraltet === undefined).length })).filter(x => x.n > 0)
     if (teile.length === 0) return next(e)
+    // Was andere Mods hier zeichnen (z. B. die Nutzungsleiste), bleibt darunter stehen
+    const below = await next(e)
     const { Box, Text, Button } = $.ui.resolve(e)
     return (
-      <Box flexDirection="row" gap={1}>
-        <Text dimColor>
-          Offene Punkte: {teile.map(x => `${x.projekt} ${x.n}`).join(' · ')}
-        </Text>
-        <Button key="band-oeffnen" onPress={() => void $.ui.open({ id: PANE, title: TITLE })}>
-          Öffnen
-        </Button>
+      <Box flexDirection="column">
+        <Box key="band-zeile" flexDirection="row" gap={1}>
+          <Text dimColor>
+            Offene Punkte: {teile.map(x => `${x.projekt} ${x.n}`).join(' · ')}
+          </Text>
+          <Button key="band-oeffnen" onPress={() => void $.ui.open({ id: PANE, title: TITLE })}>
+            Öffnen
+          </Button>
+        </Box>
+        {below}
       </Box>
     )
   })

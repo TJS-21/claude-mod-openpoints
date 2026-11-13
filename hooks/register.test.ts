@@ -314,6 +314,22 @@ test('das Band zeigt die offenen Punkte und öffnet das Panel', async ($, on) =>
   expect(a.panes).toContain('openpoints')
 })
 
+test('ein Band einer anderen Mod bleibt unter dem Band sichtbar', async ($, on) => {
+  attrappe(on, { punkte: [{ id: 'a', text: 'Eins', isDone: false }] })
+  // steht für eine andere Mod (z. B. die Nutzungsleiste) unter dieser
+  on('ui.render', ($, e) => {
+    const { Text } = $.ui.resolve(e)
+    return h(Text, null, 'Nutzung: 5 Std 42%')
+  })
+  await $.tool.call({ tool: SETZEN, slug: 'web', projekt: 'Web', punkte: [{ id: 'a', text: 'Eins' }] } as never)
+  for (const surface of ['terminal', 'desktop'] as const) {
+    const ui = await $.ui.mount({ plugin: 'openpoints', surface, component: 'AbovePrompt', props: { hasSurvey: false, isWorking: false, maxRows: 10 } } as never)
+    expect(await ui.find({ type: 'Text', text: 'Offene Punkte: Web 1' })).toBeDefined()
+    expect(await ui.find({ type: 'Text', text: /Nutzung: 5 Std 42%/ })).toBeDefined()
+    await ui.unmount()
+  }
+})
+
 // ---- Regel im Systemprompt: vorschlagen im Chat, eintragen erst nach OK ----
 
 const COMPOSE = { model: 'm', promptModel: 'm', tools: [], outputStyle: null, traits: [] }
