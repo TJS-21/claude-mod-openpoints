@@ -32,6 +32,10 @@ const zu = atom({ plugin: 'openpoints', key: 'zu' } as const, [])
 const meldung = atom({ plugin: 'openpoints', key: 'meldung' } as const, '')
 // Ob die Seitenleiste gerade offen ist: das Band zeigt dann „Einklappen“ statt „Öffnen“
 const offen = atom({ plugin: 'openpoints', key: 'offen' } as const, false)
+// Aufgeklappte Bereiche unten in der Seitenleiste („veraltet“, „erledigt“); zu sind sie von Anfang an
+const auf = atom({ plugin: 'openpoints', key: 'auf' } as const, [])
+// Uhrzeit des letzten Abgleichs mit GitHub, z. B. „22:41“
+const stand = atom({ plugin: 'openpoints', key: 'stand' } as const, '')
 
 // Seitenleiste öffnen bzw. schließen und den Zustand fürs Band merken
 async function leisteAuf($: EngineInterface) {
@@ -88,6 +92,14 @@ function nacheinander<T>(f: () => Promise<T>): Promise<T> {
   const p = kette.then(f, f)
   kette = p.catch(() => undefined)
   return p
+}
+
+function uhrzeit(ms: number): string {
+  try {
+    return new Intl.DateTimeFormat('de-DE', { timeZone: 'Europe/Berlin', hour: '2-digit', minute: '2-digit' }).format(new Date(ms))
+  } catch {
+    return ''
+  }
 }
 
 async function heute($: EngineInterface): Promise<string> {
@@ -159,6 +171,8 @@ function laden($: EngineInterface) {
     const hinweis = await abgleichen($, dir)
     await update($, meldung, () => hinweis)
     await einlesen($, dir)
+    const jetzt = await $.clock.now()
+    await update($, stand, () => uhrzeit(jetzt))
   }).catch(() => update($, meldung, () => 'Laden fehlgeschlagen.'))
 }
 
@@ -581,101 +595,125 @@ export const register: Register = (on, options) => {
   })
 
   on('ui.render', { component: 'Pane', requestId: PANE }, async ($, e) => {
-    const { Box, Text, Button, Link } = $.ui.resolve(e)
+    const { Box, Text, Button, Link, Markdown } = $.ui.resolve(e)
     const alle = await read($, listen)
     const zugeklappt = await read($, zu)
+    const offeneBereiche = await read($, auf)
     const hinweis = await read($, meldung)
+    const zeit = await read($, stand)
     const tag = await heute($)
     const sitzung = await $.session.id()
     // Auf dem Handy liefe `open` auf dem Mac, nicht auf dem Handy: dort nur der Web-Link.
     const inApp = e.surface !== 'mobile'
+    // Kleine blaue Text-Links wie im Band; im Terminal (und ohne https-Repo) Knöpfe.
+    const ziel = DATEN.replace(/\.git$/, '')
+    const alsLinks = e.surface !== 'terminal' && ziel.startsWith('https://')
+    type Aktion = { key: string; label: string; run: () => void; href?: string }
+    // Eine Zeile Aktionen, durch „·“ getrennt. Gibt die App einen Klick nicht weiter,
+    // öffnet der Link nur das Listen-Repo (bzw. den Chat im Browser).
+    const aktionen = (zeile: string, liste: Aktion[]) =>
+      alsLinks ? (
+        <Box key={zeile} flexDirection="row" alignItems="center" gap={1}>
+          {liste.map((a, i) => {
+            const href = a.href ?? `${ziel}#${a.key}`
+            return (
+              <Box key={`${a.key}-box`} flexDirection="row" alignItems="center" gap={1}>
+                {i > 0 ? <Text dimColor>·</Text> : null}
+                <Markdown key={a.key} text={`[${a.label}](${href})`} pressableLinks={[href]} onLinkPress={a.run} />
+              </Box>
+            )
+          })}
+        </Box>
+      ) : (
+        <Box key={zeile} flexDirection="row" gap={1}>
+          {liste.map(a => (
+            <Button key={a.key} onPress={a.run}>
+              {a.label}
+            </Button>
+          ))}
+        </Box>
+      )
+    const umschalten = (bereich: string, istAuf: boolean) => () =>
+      void update($, auf, z => (istAuf ? z.filter(s => s !== bereich) : [...z, bereich]))
+
+    const anzahl = alle.reduce((n, l) => n + l.punkte.filter(p => !p.isDone && p.veraltet === undefined).length, 0)
+    const veraltet = alle.flatMap(l => l.punkte.filter(p => !p.isDone && p.veraltet !== undefined).map(p => ({ l, p })))
+    const erledigt = alle.flatMap(l => l.punkte.filter(p => p.isDone && tageSeit(p.erledigtAm, tag) < ERLEDIGT_TAGE).map(p => ({ l, p })))
+    const veraltetAuf = offeneBereiche.includes('veraltet')
+    const erledigtAuf = offeneBereiche.includes('erledigt')
+
+    const kopf = (key: string, titel: string, n: number, istZu: boolean, run: () => void, grau: boolean) => (
+      <Box key={key} flexDirection="row" alignItems="center" justifyContent="space-between" gap={1} {...(grau ? { backgroundColor: '#3A3A3C', paddingX: 1 } : {})}>
+        <Text {...(grau ? {} : { dimColor: true, size: 'caption' as const })}>
+          {titel} <Text dimColor>{grau ? n : `(${n})`}</Text>
+        </Text>
+        {alsLinks ? (
+          <Markdown key={`${key}-link`} text={`[${istZu ? 'Aufklappen' : 'Zuklappen'}](${ziel}#${key})`} pressableLinks={[`${ziel}#${key}`]} onLinkPress={run} />
+        ) : (
+          <Button key={`${key}-link`} onPress={run}>
+            {istZu ? 'Aufklappen' : 'Zuklappen'}
+          </Button>
+        )}
+      </Box>
+    )
 
     return (
       <Box flexDirection="column" gap={1}>
-        <Box flexDirection="row" gap={1}>
-          <Button key="reload" onPress={() => void laden($)}>Aktualisieren</Button>
+        <Box key="oben" flexDirection="row" alignItems="center" justifyContent="space-between" gap={1}>
+          <Text size="caption" dimColor>
+            {anzahl} offen{zeit !== '' ? ` · Stand ${zeit}` : ''}
+          </Text>
+          {aktionen('oben-aktionen', [{ key: 'reload', label: 'Aktualisieren', run: () => void laden($) }])}
         </Box>
-        {hinweis !== '' && <Text dimColor>{hinweis}</Text>}
+        {hinweis !== '' && <Text size="caption" dimColor>{hinweis}</Text>}
         {alle.length === 0 && <Text dimColor>Noch keine Listen.</Text>}
         {alle.map(l => {
-          const offen = l.punkte.filter(p => !p.isDone && p.veraltet === undefined)
-          const veraltet = l.punkte.filter(p => !p.isDone && p.veraltet !== undefined)
-          const erledigt = l.punkte.filter(p => p.isDone && tageSeit(p.erledigtAm, tag) < ERLEDIGT_TAGE)
+          const offenePunkte = l.punkte.filter(p => !p.isDone && p.veraltet === undefined)
+          if (offenePunkte.length === 0) return null
           const istZu = zugeklappt.includes(l.slug)
           return (
-            <Box flexDirection="column" gap={1}>
-              <Box flexDirection="row" gap={1}>
-                <Text bold>{l.projekt} ({offen.length})</Text>
-                <Button
-                  key={`fold-${l.slug}`}
-                  onPress={() => void update($, zu, z => (istZu ? z.filter(s => s !== l.slug) : [...z, l.slug]))}
-                >
-                  {istZu ? 'Aufklappen' : 'Zuklappen'}
-                </Button>
-              </Box>
-              {!istZu && offen.map(p => {
+            <Box key={`liste-${l.slug}`} flexDirection="column" gap={1}>
+              {kopf(`fold-${l.slug}`, l.projekt, offenePunkte.length, istZu, () => void update($, zu, z => (istZu ? z.filter(s => s !== l.slug) : [...z, l.slug])), true)}
+              {!istZu && offenePunkte.map(p => {
                 const chatId = p.chat !== undefined ? CHAT.exec(p.chat)?.[1] : undefined
+                const chatUrl = chatId !== undefined ? `https://claude.ai/chat/${chatId}` : undefined
                 const alt = tageSeit(p.geaendert ?? p.erstellt, tag) >= ALT_TAGE
+                const liste: Aktion[] = [
+                  { key: `done-${l.slug}-${p.id}`, label: 'Erledigt', run: () => void mitMeldung($, `Hake ab: ${p.text}`, `Abgehakt: ${p.text}`, () => setzeStatus($, l.slug, p.id, true, p.text, l.projekt)) },
+                  { key: `stale-${l.slug}-${p.id}`, label: 'Veraltet', run: () => void mitMeldung($, `Markiere: ${p.text}`, `Als veraltet markiert: ${p.text}`, () => veraltetSetzen($, l.slug, p.id, true, p.text, l.projekt)) },
+                  // In der App öffnet „Zum Chat“ den Chat in der Claude-App; sonst im Browser
+                  ...(alsLinks && inApp && chatId !== undefined && chatUrl !== undefined ? [{ key: `chat-${l.slug}-${p.id}`, label: 'Zum Chat', href: chatUrl, run: () => void zumChat($, chatId) }] : []),
+                  ...(!alsLinks && inApp && chatId !== undefined ? [{ key: `chat-${l.slug}-${p.id}`, label: 'Zum Chat', run: () => void zumChat($, chatId) }] : []),
+                  ...(p.sitzung !== undefined && p.sitzung === sitzung
+                    ? [{ key: `ask-${l.slug}-${p.id}`, label: 'Frage dazu', run: () => void frageEinfuegen($, `Frage zu „${p.text}“ (${l.projekt}): Wie gehe ich da genau vor?`) }]
+                    : []),
+                ]
                 return (
-                  <Box flexDirection="column">
+                  <Box key={`punkt-${l.slug}-${p.id}`} flexDirection="column">
                     <Text>{alt ? '(alt?) ' : ''}{p.text}</Text>
-                    {chatId !== undefined && <Link href={`https://claude.ai/chat/${chatId}`}>Zum Chat</Link>}
-                    <Box flexDirection="row" gap={1}>
-                      <Button
-                        key={`done-${l.slug}-${p.id}`}
-                        onPress={() => void mitMeldung($, `Hake ab: ${p.text}`, `Abgehakt: ${p.text}`, () => setzeStatus($, l.slug, p.id, true, p.text, l.projekt))}
-                      >
-                        Erledigt
-                      </Button>
-                      {inApp && chatId !== undefined && (
-                        <Button key={`chat-${l.slug}-${p.id}`} onPress={() => void zumChat($, chatId)}>
-                          Zum Chat
-                        </Button>
-                      )}
-                      {p.sitzung !== undefined && p.sitzung === sitzung && (
-                        <Button
-                          key={`ask-${l.slug}-${p.id}`}
-                          onPress={() => void frageEinfuegen($, `Frage zu „${p.text}“ (${l.projekt}): Wie gehe ich da genau vor?`)}
-                        >
-                          Frage dazu
-                        </Button>
-                      )}
-                      <Button
-                        key={`stale-${l.slug}-${p.id}`}
-                        onPress={() => void mitMeldung($, `Markiere: ${p.text}`, `Als veraltet markiert: ${p.text}`, () => veraltetSetzen($, l.slug, p.id, true, p.text, l.projekt))}
-                      >
-                        Veraltet
-                      </Button>
-                    </Box>
+                    {aktionen(`akt-${l.slug}-${p.id}`, liste)}
+                    {/* Web-Link zum Chat: auf dem Handy und im Terminal; in der App steckt er in „Zum Chat“ */}
+                    {chatUrl !== undefined && (!alsLinks || !inApp) && <Link href={chatUrl}>Zum Chat</Link>}
                   </Box>
                 )
               })}
-              {!istZu && veraltet.length > 0 && <Text dimColor>Als veraltet markiert:</Text>}
-              {!istZu && veraltet.map(p => (
-                <Box flexDirection="row" gap={1}>
-                  <Text dimColor>{p.text}</Text>
-                  <Button
-                    key={`unstale-${l.slug}-${p.id}`}
-                    onPress={() => void mitMeldung($, `Hole zurück: ${p.text}`, `Wieder offen: ${p.text}`, () => veraltetSetzen($, l.slug, p.id, false, p.text, l.projekt))}
-                  >
-                    Zurück
-                  </Button>
-                </Box>
-              ))}
-              {!istZu && erledigt.map(p => (
-                <Box flexDirection="row" gap={1}>
-                  <Text dimColor>✓ {p.text}</Text>
-                  <Button
-                    key={`undo-${l.slug}-${p.id}`}
-                    onPress={() => void mitMeldung($, `Hole zurück: ${p.text}`, `Wieder offen: ${p.text}`, () => setzeStatus($, l.slug, p.id, false, p.text, l.projekt))}
-                  >
-                    Zurück
-                  </Button>
-                </Box>
-              ))}
             </Box>
           )
         })}
+        {veraltet.length > 0 && kopf('bereich-veraltet', 'Veraltet', veraltet.length, !veraltetAuf, umschalten('veraltet', veraltetAuf), false)}
+        {veraltetAuf && veraltet.map(({ l, p }) => (
+          <Box key={`veraltet-${l.slug}-${p.id}`} flexDirection="row" alignItems="center" justifyContent="space-between" gap={1}>
+            <Text dimColor>{p.text}</Text>
+            {aktionen(`akt-unstale-${l.slug}-${p.id}`, [{ key: `unstale-${l.slug}-${p.id}`, label: 'Zurück', run: () => void mitMeldung($, `Hole zurück: ${p.text}`, `Wieder offen: ${p.text}`, () => veraltetSetzen($, l.slug, p.id, false, p.text, l.projekt)) }])}
+          </Box>
+        ))}
+        {erledigt.length > 0 && kopf('bereich-erledigt', 'Erledigt', erledigt.length, !erledigtAuf, umschalten('erledigt', erledigtAuf), false)}
+        {erledigtAuf && erledigt.map(({ l, p }) => (
+          <Box key={`erledigt-${l.slug}-${p.id}`} flexDirection="row" alignItems="center" justifyContent="space-between" gap={1}>
+            <Text dimColor>✓ {p.text}</Text>
+            {aktionen(`akt-undo-${l.slug}-${p.id}`, [{ key: `undo-${l.slug}-${p.id}`, label: 'Zurück', run: () => void mitMeldung($, `Hole zurück: ${p.text}`, `Wieder offen: ${p.text}`, () => setzeStatus($, l.slug, p.id, false, p.text, l.projekt)) }])}
+          </Box>
+        ))}
       </Box>
     )
   })

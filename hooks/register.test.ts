@@ -195,6 +195,22 @@ test('punkte_erledigt hakt ab', async ($, on) => {
   expect(a.liste().punkte[0]).toEqual({ id: 'x', text: 'Offen', isDone: true, erstellt: '2026-10-19', erledigtAm: HEUTE, geaendert: HEUTE })
 })
 
+// ---- Panel: graue Projektstreifen, kleine Links (Terminal: Knöpfe), nichts in den Chat ----
+
+// Ein Element per key finden, egal ob Link (Markdown) oder Knopf
+async function finde(ui: { find: (q: never) => Promise<unknown> }, key: string) {
+  return (await ui.find({ type: 'Markdown', key } as never)) ?? (await ui.find({ type: 'Button', key } as never))
+}
+// Einen Link (mit seiner Adresse) oder Knopf drücken
+async function klick(ui: { find: (q: never) => Promise<unknown>; press: (t: never) => Promise<unknown> }, key: string) {
+  const md = await ui.find({ type: 'Markdown', key } as never)
+  if (md !== undefined) {
+    const href = /\]\((https:[^)\\"]+)\)/.exec(JSON.stringify(md))?.[1] ?? ''
+    return ui.press({ key, link: { href } } as never)
+  }
+  return ui.press({ key } as never)
+}
+
 test('Erledigtes verschwindet nach 14 Tagen, Unberührtes bekommt nach 30 Tagen „alt?“', async ($, on) => {
   attrappe(on, {
     punkte: [
@@ -206,97 +222,124 @@ test('Erledigtes verschwindet nach 14 Tagen, Unberührtes bekommt nach 30 Tagen 
   })
   await $.tool.call({ tool: SETZEN, slug: 'web', projekt: 'Web', punkte: [{ id: 'frisch', text: 'Frisch erledigt' }, { id: 'lange', text: 'Lange erledigt' }, { id: 'alt', text: 'Liegt herum' }, { id: 'jung', text: 'Ganz neu' }] } as never)
   const ui = await $.ui.mount({ ...PANE, surface: 'desktop' } as never)
-  expect(await ui.find({ type: 'Button', key: 'undo-web-frisch' })).toBeDefined()
-  expect(await ui.find({ type: 'Button', key: 'undo-web-lange' })).toBeUndefined()
+  // Erledigtes ist zugeklappt
+  expect(await finde(ui, 'undo-web-frisch')).toBeUndefined()
+  await klick(ui, 'bereich-erledigt-link')
+  expect(await finde(ui, 'undo-web-frisch')).toBeDefined()
+  expect(await finde(ui, 'undo-web-lange')).toBeUndefined()
   expect(await ui.find({ type: 'Text', text: '(alt?) Liegt herum' })).toBeDefined()
   expect(await ui.find({ type: 'Text', text: '(alt?) Ganz neu' })).toBeUndefined()
 })
 
-// ---- Panel: Aufbau wie 0.4.1, nichts in den Chat ----
-
-const knopfProps = (b: unknown) => (b as { props?: Record<string, unknown> }).props ?? {}
-
-test('Aufbau: Text, Web-Link, Erledigt · Zum Chat · Frage dazu · Veraltet, alle Ton in Ton', async ($, on) => {
+test('Aufbau in der App: grauer Streifen je Projekt, kleine Links statt Knöpfe, oben Aktualisieren', async ($, on) => {
   attrappe(on, { punkte: [{ id: 'a', text: 'Offen', isDone: false, chat: `https://claude.ai/chat/${UUID}`, sitzung: 'sitzung-1' }] })
   await $.tool.call({ tool: SETZEN, slug: 'web', projekt: 'Web', punkte: [{ id: 'a', text: 'Offen' }] } as never)
-  for (const surface of ['desktop', 'terminal'] as const) {
+  const ui = await $.ui.mount({ ...PANE, surface: 'desktop' } as never)
+  expect(await ui.findAll({ type: 'Button' } as never)).toEqual([])
+  const links = (await ui.findAll({ type: 'Markdown' } as never)).map(m => (m as { key?: string }).key)
+  expect(links).toEqual(['reload', 'fold-web-link', 'done-web-a', 'stale-web-a', 'chat-web-a', 'ask-web-a'])
+  // „Zum Chat“ zeigt auf den echten Chat (Browser, falls die App den Klick nicht weitergibt)
+  expect(JSON.stringify(await ui.find({ type: 'Markdown', key: 'chat-web-a' } as never))).toContain(`https://claude.ai/chat/${UUID}`)
+  expect(await ui.find({ type: 'Link', text: 'Zum Chat' })).toBeUndefined()
+  expect(await ui.find({ type: 'Text', text: /1 offen/ })).toBeDefined()
+  expect(JSON.stringify(await ui.findAll({ type: 'Box' } as never))).toContain('#3A3A3C')
+  await ui.unmount()
+})
+
+test('Aufbau im Terminal: Knöpfe und Web-Link', async ($, on) => {
+  attrappe(on, { punkte: [{ id: 'a', text: 'Offen', isDone: false, chat: `https://claude.ai/chat/${UUID}`, sitzung: 'sitzung-1' }] })
+  await $.tool.call({ tool: SETZEN, slug: 'web', projekt: 'Web', punkte: [{ id: 'a', text: 'Offen' }] } as never)
+  const ui = await $.ui.mount({ ...PANE, surface: 'terminal' } as never)
+  const knoepfe = (await ui.findAll({ type: 'Button' })).map(b => b.key)
+  expect(knoepfe.filter(k => k?.endsWith('-web-a'))).toEqual(['done-web-a', 'stale-web-a', 'chat-web-a', 'ask-web-a'])
+  expect(await ui.find({ type: 'Link', text: 'Zum Chat' })).toBeDefined()
+  await ui.unmount()
+})
+
+for (const surface of ['desktop', 'terminal'] as const) {
+  test(`Erledigt hakt ab, meldet es und schreibt nichts in den Chat (${surface})`, async ($, on) => {
+    const a = attrappe(on, { punkte: [{ id: 'a', text: 'Offen', isDone: false }] })
+    await $.tool.call({ tool: SETZEN, slug: 'web', projekt: 'Web', punkte: [{ id: 'a', text: 'Offen' }] } as never)
     const ui = await $.ui.mount({ ...PANE, surface } as never)
-    const knoepfe = await ui.findAll({ type: 'Button' })
-    expect(knoepfe.map(b => b.key).filter(k => k?.endsWith('-web-a'))).toEqual(['done-web-a', 'chat-web-a', 'ask-web-a', 'stale-web-a'])
-    expect(knoepfe.every(b => knopfProps(b).variant === undefined)).toBe(true)
-    expect(await ui.find({ type: 'Button', text: 'Erledigt' })).toBeDefined()
-    expect(await ui.find({ type: 'Link', text: 'Zum Chat' })).toBeDefined()
-    await ui.unmount()
-  }
-})
-
-test('Erledigt hakt ab, meldet es in der Leiste und schreibt nichts in den Chat', async ($, on) => {
-  const a = attrappe(on, { punkte: [{ id: 'a', text: 'Offen', isDone: false }] })
-  await $.tool.call({ tool: SETZEN, slug: 'web', projekt: 'Web', punkte: [{ id: 'a', text: 'Offen' }] } as never)
-  const ui = await $.ui.mount({ ...PANE, surface: 'desktop' } as never)
-  await ui.press({ key: 'done-web-a' })
-  expect(a.prompts).toEqual([])
-  expect(a.liste().punkte[0]?.isDone).toBe(true)
-  expect(await ui.find({ type: 'Text', text: 'Abgehakt: Offen' })).toBeDefined()
-  expect(await ui.find({ type: 'Button', key: 'undo-web-a' })).toBeDefined()
-  await ui.press({ key: 'undo-web-a' })
-  expect(a.liste().punkte[0]?.isDone).toBe(false)
-  expect(await ui.find({ type: 'Text', text: 'Wieder offen: Offen' })).toBeDefined()
-  expect(a.prompts).toEqual([])
-})
-
-test('Zum Chat öffnet den Chat in der App, ohne Nachricht', async ($, on) => {
-  const a = attrappe(on, { punkte: [{ id: 'a', text: 'Offen', isDone: false, chat: `https://claude.ai/chat/${UUID}` }] })
-  await $.tool.call({ tool: SETZEN, slug: 'web', projekt: 'Web', punkte: [{ id: 'a', text: 'Offen' }] } as never)
-  const ui = await $.ui.mount({ ...PANE, surface: 'desktop' } as never)
-  await ui.press({ key: 'chat-web-a' })
-  expect(a.geoeffnet).toEqual([['open', `claude://claude.ai/chat/${UUID}`]])
-  expect(a.prompts).toEqual([])
-})
-
-test('Veraltet markiert nur, zeigt es an und zählt im Band nicht mit; Zurück hebt es auf', async ($, on) => {
-  const a = attrappe(on, { punkte: [{ id: 'a', text: 'Offen', isDone: false }, { id: 'b', text: 'Zweiter', isDone: false }] })
-  await $.tool.call({ tool: SETZEN, slug: 'web', projekt: 'Web', punkte: [{ id: 'a', text: 'Offen' }, { id: 'b', text: 'Zweiter' }] } as never)
-  const ui = await $.ui.mount({ ...PANE, surface: 'desktop' } as never)
-  await ui.press({ key: 'stale-web-a' })
-  expect(a.prompts).toEqual([])
-  expect(a.liste().punkte[0]?.veraltet).toBe(HEUTE)
-  expect(await ui.find({ type: 'Text', text: 'Als veraltet markiert: Offen' })).toBeDefined()
-  expect(await ui.find({ type: 'Button', key: 'done-web-a' })).toBeUndefined()
-  expect(await ui.find({ type: 'Button', key: 'unstale-web-a' })).toBeDefined()
-  expect(await ui.find({ type: 'Text', text: 'Web (1)' })).toBeDefined()
-  const band = await $.ui.mount({ plugin: 'openpoints', surface: 'desktop', component: 'AbovePrompt', props: { hasSurvey: false, isWorking: false, maxRows: 10 } } as never)
-  expect(await band.find({ type: 'Text', text: 'Offene Punkte: Web 1' })).toBeDefined()
-  await ui.press({ key: 'unstale-web-a' })
-  expect(a.liste().punkte[0]?.veraltet).toBeUndefined()
-  expect(await ui.find({ type: 'Button', key: 'done-web-a' })).toBeDefined()
-  expect(a.prompts).toEqual([])
-})
-
-test('Frage dazu gibt es nur in der Sitzung, in der der Punkt entstand', async ($, on) => {
-  const a = attrappe(on, {
-    punkte: [
-      { id: 'a', text: 'Von hier', isDone: false, sitzung: 'sitzung-1' },
-      { id: 'b', text: 'Von woanders', isDone: false, sitzung: 'andere' },
-      { id: 'c', text: 'Aus claude.ai', isDone: false, chat: `https://claude.ai/chat/${UUID}` },
-    ],
+    await klick(ui, 'done-web-a')
+    expect(a.prompts).toEqual([])
+    expect(a.liste().punkte[0]?.isDone).toBe(true)
+    expect(await ui.find({ type: 'Text', text: 'Abgehakt: Offen' })).toBeDefined()
+    await klick(ui, 'bereich-erledigt-link')
+    expect(await finde(ui, 'undo-web-a')).toBeDefined()
+    await klick(ui, 'undo-web-a')
+    expect(a.liste().punkte[0]?.isDone).toBe(false)
+    expect(await ui.find({ type: 'Text', text: 'Wieder offen: Offen' })).toBeDefined()
+    expect(a.prompts).toEqual([])
   })
-  await $.tool.call({ tool: SETZEN, slug: 'web', projekt: 'Web', punkte: [{ id: 'a', text: 'Von hier' }, { id: 'b', text: 'Von woanders' }, { id: 'c', text: 'Aus claude.ai' }] } as never)
+
+  test(`Zum Chat öffnet den Chat in der App, ohne Nachricht (${surface})`, async ($, on) => {
+    const a = attrappe(on, { punkte: [{ id: 'a', text: 'Offen', isDone: false, chat: `https://claude.ai/chat/${UUID}` }] })
+    await $.tool.call({ tool: SETZEN, slug: 'web', projekt: 'Web', punkte: [{ id: 'a', text: 'Offen' }] } as never)
+    const ui = await $.ui.mount({ ...PANE, surface } as never)
+    await klick(ui, 'chat-web-a')
+    expect(a.geoeffnet).toEqual([['open', `claude://claude.ai/chat/${UUID}`]])
+    expect(a.prompts).toEqual([])
+  })
+
+  test(`Veraltet markiert nur, zählt im Band nicht mit; Zurück hebt es auf (${surface})`, async ($, on) => {
+    const a = attrappe(on, { punkte: [{ id: 'a', text: 'Offen', isDone: false }, { id: 'b', text: 'Zweiter', isDone: false }] })
+    await $.tool.call({ tool: SETZEN, slug: 'web', projekt: 'Web', punkte: [{ id: 'a', text: 'Offen' }, { id: 'b', text: 'Zweiter' }] } as never)
+    const ui = await $.ui.mount({ ...PANE, surface } as never)
+    await klick(ui, 'stale-web-a')
+    expect(a.prompts).toEqual([])
+    expect(a.liste().punkte[0]?.veraltet).toBe(HEUTE)
+    expect(await ui.find({ type: 'Text', text: 'Als veraltet markiert: Offen' })).toBeDefined()
+    expect(await finde(ui, 'done-web-a')).toBeUndefined()
+    // Veraltetes ist zugeklappt
+    expect(await finde(ui, 'unstale-web-a')).toBeUndefined()
+    await klick(ui, 'bereich-veraltet-link')
+    expect(await finde(ui, 'unstale-web-a')).toBeDefined()
+    const band = await $.ui.mount({ plugin: 'openpoints', surface: 'desktop', component: 'AbovePrompt', props: { hasSurvey: false, isWorking: false, maxRows: 10 } } as never)
+    expect(await band.find({ type: 'Text', text: 'Offene Punkte: Web 1' })).toBeDefined()
+    await klick(ui, 'unstale-web-a')
+    expect(a.liste().punkte[0]?.veraltet).toBeUndefined()
+    expect(await finde(ui, 'done-web-a')).toBeDefined()
+    expect(a.prompts).toEqual([])
+  })
+
+  test(`Frage dazu gibt es nur in der Sitzung, in der der Punkt entstand (${surface})`, async ($, on) => {
+    const a = attrappe(on, {
+      punkte: [
+        { id: 'a', text: 'Von hier', isDone: false, sitzung: 'sitzung-1' },
+        { id: 'b', text: 'Von woanders', isDone: false, sitzung: 'andere' },
+        { id: 'c', text: 'Aus claude.ai', isDone: false, chat: `https://claude.ai/chat/${UUID}` },
+      ],
+    })
+    await $.tool.call({ tool: SETZEN, slug: 'web', projekt: 'Web', punkte: [{ id: 'a', text: 'Von hier' }, { id: 'b', text: 'Von woanders' }, { id: 'c', text: 'Aus claude.ai' }] } as never)
+    const ui = await $.ui.mount({ ...PANE, surface } as never)
+    expect(await finde(ui, 'ask-web-a')).toBeDefined()
+    expect(await finde(ui, 'ask-web-b')).toBeUndefined()
+    expect(await finde(ui, 'ask-web-c')).toBeUndefined()
+    await klick(ui, 'ask-web-a')
+    // nur ins Eingabefeld gelegt, nichts abgeschickt
+    expect(a.eingefuegt).toEqual(['Frage zu „Von hier“ (Web): Wie gehe ich da genau vor?'])
+    expect(a.prompts).toEqual([])
+  })
+}
+
+test('Projekt zuklappen und aufklappen', async ($, on) => {
+  attrappe(on, { punkte: [{ id: 'a', text: 'Offen', isDone: false }] })
+  await $.tool.call({ tool: SETZEN, slug: 'web', projekt: 'Web', punkte: [{ id: 'a', text: 'Offen' }] } as never)
   const ui = await $.ui.mount({ ...PANE, surface: 'desktop' } as never)
-  expect(await ui.find({ type: 'Button', key: 'ask-web-a' })).toBeDefined()
-  expect(await ui.find({ type: 'Button', key: 'ask-web-b' })).toBeUndefined()
-  expect(await ui.find({ type: 'Button', key: 'ask-web-c' })).toBeUndefined()
-  await ui.press({ key: 'ask-web-a' })
-  // nur ins Eingabefeld gelegt, nichts abgeschickt
-  expect(a.eingefuegt).toEqual(['Frage zu „Von hier“ (Web): Wie gehe ich da genau vor?'])
-  expect(a.prompts).toEqual([])
+  expect(JSON.stringify(await ui.find({ type: 'Markdown', key: 'fold-web-link' } as never))).toContain('[Zuklappen]')
+  await klick(ui, 'fold-web-link')
+  expect(await finde(ui, 'done-web-a')).toBeUndefined()
+  expect(JSON.stringify(await ui.find({ type: 'Markdown', key: 'fold-web-link' } as never))).toContain('[Aufklappen]')
+  await klick(ui, 'fold-web-link')
+  expect(await finde(ui, 'done-web-a')).toBeDefined()
 })
 
 test('auf dem Handy gibt es nur den Web-Link, keinen App-Knopf', async ($, on) => {
   attrappe(on, { punkte: [{ id: 'a', text: 'Offen', isDone: false, chat: `https://claude.ai/chat/${UUID}` }] })
   await $.tool.call({ tool: SETZEN, slug: 'web', projekt: 'Web', punkte: [{ id: 'a', text: 'Offen' }] } as never)
   const ui = await $.ui.mount({ ...PANE, surface: 'mobile' } as never)
-  expect(await ui.find({ type: 'Button', key: 'chat-web-a' })).toBeUndefined()
+  expect(await finde(ui, 'chat-web-a')).toBeUndefined()
   expect(await ui.find({ type: 'Link', text: 'Zum Chat' })).toBeDefined()
 })
 
@@ -304,7 +347,7 @@ test('ohne gültigen Chat-Link weder App-Knopf noch Web-Link', async ($, on) => 
   attrappe(on, { punkte: [{ id: 'a', text: 'Offen', isDone: false, chat: 'https://example.com/x' }] })
   await $.tool.call({ tool: SETZEN, slug: 'web', projekt: 'Web', punkte: [{ id: 'a', text: 'Offen' }] } as never)
   const ui = await $.ui.mount({ ...PANE, surface: 'desktop' } as never)
-  expect(await ui.find({ type: 'Button', key: 'chat-web-a' })).toBeUndefined()
+  expect(await finde(ui, 'chat-web-a')).toBeUndefined()
   expect(await ui.find({ type: 'Link', text: 'Zum Chat' })).toBeUndefined()
 })
 
