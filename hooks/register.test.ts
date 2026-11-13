@@ -25,12 +25,17 @@ function attrappe(on: On, opts: Opts = {}) {
   const panes: string[] = []
   const geschlossen: string[] = []
   const prompts: string[] = []
+  const eingefuegt: string[] = []
   let aktiv = 0
   let maxAktiv = 0
   on('clock.now', async () => ({ value: Date.parse(`${HEUTE}T12:00:00Z`) }) as never)
   on('session.surfaces', async () => ({ value: opts.flaechen ?? ['desktop'] }) as never)
   on('session.id', async () => ({ value: opts.sitzung ?? 'sitzung-1' }) as never)
   // Zählt jede Nachricht, die in den Chat ginge.
+  on('prompt.fill', async (_$, e) => {
+    eingefuegt.push((e as { text: string }).text)
+    return { isFilled: true } as never
+  })
   on('prompt.submit', async (_$, e) => {
     prompts.push((e as { text: string }).text)
     return { text: (e as { text: string }).text } as never
@@ -84,7 +89,7 @@ function attrappe(on: On, opts: Opts = {}) {
     return { value: { isPlaced: true } } as never
   })
   const liste = (slug = 'web') => JSON.parse(dateien.get(`${dir}/punkte/${slug}.json`) ?? '{"punkte":[]}') as { projekt: string; punkte: Record<string, unknown>[] }
-  return { dateien, git, aufrufe, geoeffnet, modell, panes, geschlossen, prompts, liste, maxAktiv: () => maxAktiv }
+  return { dateien, git, aufrufe, geoeffnet, modell, panes, geschlossen, prompts, eingefuegt, liste, maxAktiv: () => maxAktiv }
 }
 
 // ---- Speichern ----
@@ -282,7 +287,9 @@ test('Frage dazu gibt es nur in der Sitzung, in der der Punkt entstand', async (
   expect(await ui.find({ type: 'Button', key: 'ask-web-b' })).toBeUndefined()
   expect(await ui.find({ type: 'Button', key: 'ask-web-c' })).toBeUndefined()
   await ui.press({ key: 'ask-web-a' })
-  expect(a.prompts).toEqual(['Frage zu „Von hier“ (Web): Wie gehe ich da genau vor?'])
+  // nur ins Eingabefeld gelegt, nichts abgeschickt
+  expect(a.eingefuegt).toEqual(['Frage zu „Von hier“ (Web): Wie gehe ich da genau vor?'])
+  expect(a.prompts).toEqual([])
 })
 
 test('auf dem Handy gibt es nur den Web-Link, keinen App-Knopf', async ($, on) => {

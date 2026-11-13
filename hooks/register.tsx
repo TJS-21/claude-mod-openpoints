@@ -343,6 +343,13 @@ async function zumChat($: EngineInterface, id: string) {
   if (r.exitCode !== 0) await update($, meldung, () => 'Chat konnte nicht in der App geöffnet werden.')
 }
 
+// „Frage dazu“ legt die Frage nur ins Eingabefeld; abgeschickt wird sie von der Person selbst.
+// So wird gespeicherter Text nie ungesehen zu einer eigenen Nachricht an Claude.
+async function frageEinfuegen($: EngineInterface, text: string) {
+  const r = await $.prompt.fill({ text })
+  await update($, meldung, () => (r.isFilled ? 'Frage steht im Eingabefeld – zum Abschicken Enter drücken.' : 'Frage konnte nicht ins Eingabefeld gelegt werden.'))
+}
+
 export const register: Register = (on, options) => {
   einstellen(options)
 
@@ -628,7 +635,7 @@ export const register: Register = (on, options) => {
                       {p.sitzung !== undefined && p.sitzung === sitzung && (
                         <Button
                           key={`ask-${l.slug}-${p.id}`}
-                          onPress={() => void $.prompt.submit({ text: `Frage zu „${p.text}“ (${l.projekt}): Wie gehe ich da genau vor?`, asUser: true })}
+                          onPress={() => void frageEinfuegen($, `Frage zu „${p.text}“ (${l.projekt}): Wie gehe ich da genau vor?`)}
                         >
                           Frage dazu
                         </Button>

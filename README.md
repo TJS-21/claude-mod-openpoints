@@ -8,7 +8,7 @@ Eine Claude-Code-Mod: offene Aufgaben je Projekt, die sich selbst füllen.
 - Klicks in der Leiste ändern nur die Liste und schreiben **nichts in den laufenden Chat**; oben zeigt eine Zeile, was passiert ist („Abgehakt: …“).
   - **Erledigt** hakt ab (mit **Zurück**, 14 Tage sichtbar).
   - **Zum Chat** öffnet den Ursprungs-Chat in der Claude-App auf dem Mac; auf dem Handy gibt es nur den Web-Link.
-  - **Frage dazu** gibt es nur in der Claude-Code-Sitzung, in der der Punkt entstand.
+  - **Frage dazu** gibt es nur in der Claude-Code-Sitzung, in der der Punkt entstand. Der Knopf legt die Frage ins Eingabefeld; abgeschickt wird sie von dir.
   - **Veraltet** markiert den Punkt (Bereich „Als veraltet markiert“, mit **Zurück**). Geklärt wird später im passenden Chat; Claude trägt das Ergebnis mit `punkte_klaeren` ein.
 - Offene Punkte, die 30 Tage niemand angefasst hat, bekommen „(alt?)“.
 
