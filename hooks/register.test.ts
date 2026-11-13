@@ -580,3 +580,21 @@ test('eine unzulässige Sitzungskennung wird nicht geöffnet', async ($, on) => 
   expect(await finde(ui, 'sitzung-web-x')).toBeUndefined()
   expect(a.geoeffnet).toEqual([])
 })
+
+test('punkte_setzen lehnt Kennungen mit Sonderzeichen ab', async ($, on) => {
+  const a = attrappe(on)
+  const r = await $.tool.call({ tool: SETZEN, slug: 'web', projekt: 'Web', punkte: [{ id: 'x) [Hier klicken](https://evil.example/', text: 'Harmlos' }] } as never)
+  expect(JSON.stringify(r)).toContain('Ungültige id')
+  expect(a.git).toEqual([])
+})
+
+test('eine alte Kennung mit Sonderzeichen kann keinen Link einschleusen', async ($, on) => {
+  attrappe(on, { punkte: [{ id: 'x) [Hier klicken](https://evil.example/', text: 'Harmlos', isDone: false }] })
+  await $.tool.call({ tool: HINZU, punkte: [{ slug: 'web', projekt: 'Web', text: 'Etwas anderes' }] } as never)
+  const ui = await $.ui.mount({ ...PANE, surface: 'desktop' } as never)
+  await alleAuf(ui)
+  const texte = (await ui.findAll({ type: 'Markdown' } as never)).map(m => (m as { props?: { text?: string } }).props?.text ?? '')
+  expect(texte.length).toBeGreaterThan(3)
+  expect(texte.some(t => t.includes('evil.example'))).toBe(false)
+  for (const t of texte) expect(t).toMatch(/^\[[^\]]+\]\(https:\/\/[A-Za-z0-9._~\/#-]+\)$/)
+})

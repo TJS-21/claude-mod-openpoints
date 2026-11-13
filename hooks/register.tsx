@@ -23,6 +23,12 @@ const SLUG = /^[a-z0-9][a-z0-9-]*$/
 // Zeichen zum Auf- und Zuklappen: zugeklappt ein mittelgroßes Dreieck nach unten (wie bei einem Drop-down), aufgeklappt ein Minus
 const PFEIL_ZU = '⏷'
 const PFEIL_AUF = '−'
+// Kennung eines Punkts: wie ein slug, damit sie gefahrlos in Link-Adressen und Tasten-Schlüsseln stehen kann
+const ID = /^[a-z0-9][a-z0-9-]{0,79}$/
+// Für Link-Adressen: alles außer Buchstaben, Ziffern, - und _ ersetzen (auch für alte oder von Hand geänderte Listen)
+// Repo-Adresse als Basis der Link-Adressen: nur schlichte https-Adressen
+const LINK_BASIS = /^https:\/\/[A-Za-z0-9._~\/-]+$/
+const anker = (key: string) => key.replace(/[^A-Za-z0-9_-]/g, '_')
 // Kennung einer Sitzung der Desktop-App (für den Link „Zur Sitzung“)
 const APP_SITZUNG = /^local_[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/
 const CHAT = /^https:\/\/claude\.ai\/chat\/([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})$/
@@ -412,7 +418,7 @@ export const register: Register = (on, options) => {
             items: {
               type: 'object',
               properties: {
-                id: { type: 'string' },
+                id: { type: 'string', pattern: ID.source },
                 text: { type: 'string', description: 'Kurzer Titel, höchstens etwa 6 Wörter' },
                 kontext: { type: 'string', description: '1–3 Sätze: worum es geht, nächster Schritt, Anlass' },
                 isDone: { type: 'boolean' },
@@ -506,6 +512,8 @@ export const register: Register = (on, options) => {
   on('tool.call', { tool: TOOL_SETZEN }, async ($, e) => {
     const input = e as unknown as Eingabe
     if (!SLUG.test(input.slug)) return { deny: `Ungültiger slug „${input.slug}“: nur Kleinbuchstaben, Ziffern und Bindestriche.` }
+    const falscheId = input.punkte.find(p => typeof p.id !== 'string' || !ID.test(p.id))
+    if (falscheId) return { deny: 'Ungültige id eines Punkts: nur Kleinbuchstaben, Ziffern und Bindestriche, höchstens 80 Zeichen.' }
     const sitzung = await $.session.id()
     const sitzungApp = await appSitzung($)
     const neu = (alt: Liste | undefined, tag: string): Liste => ({
@@ -603,7 +611,7 @@ export const register: Register = (on, options) => {
     // Gibt die App den Klick nicht weiter, öffnet der Link das Listen-Repo im Browser.
     const ziel = DATEN.replace(/\.git$/, '')
     const knopf =
-      e.surface === 'terminal' || !ziel.startsWith('https://') ? (
+      e.surface === 'terminal' || !LINK_BASIS.test(ziel) ? (
         <Button key="band-oeffnen" onPress={oeffnen}>
           {wort}
         </Button>
@@ -637,7 +645,7 @@ export const register: Register = (on, options) => {
     const inApp = e.surface !== 'mobile'
     // Kleine blaue Text-Links wie im Band; im Terminal (und ohne https-Repo) Knöpfe.
     const ziel = DATEN.replace(/\.git$/, '')
-    const alsLinks = e.surface !== 'terminal' && ziel.startsWith('https://')
+    const alsLinks = e.surface !== 'terminal' && LINK_BASIS.test(ziel)
     type Aktion = { key: string; label: string; run: () => void; href?: string }
     // Eine Zeile Aktionen, durch „·“ getrennt. Gibt die App einen Klick nicht weiter,
     // öffnet der Link nur das Listen-Repo (bzw. den Chat im Browser).
@@ -645,7 +653,7 @@ export const register: Register = (on, options) => {
       alsLinks ? (
         <Box key={zeile} flexDirection="row" alignItems="center" gap={1}>
           {liste.map((a, i) => {
-            const href = a.href ?? `${ziel}#${a.key}`
+            const href = a.href ?? `${ziel}#${anker(a.key)}`
             return (
               <Box key={`${a.key}-box`} flexDirection="row" alignItems="center" gap={1}>
                 {i > 0 ? <Text dimColor>·</Text> : null}
@@ -677,7 +685,7 @@ export const register: Register = (on, options) => {
     const pfeil = (key: string, istZu: boolean, run: () => void) => (
       <Box key={`${key}-spalte`} width={2} flexShrink={0} flexDirection="row" justifyContent="center">
         {alsLinks ? (
-          <Markdown key={key} text={`[${istZu ? PFEIL_ZU : PFEIL_AUF}](${ziel}#${key})`} pressableLinks={[`${ziel}#${key}`]} onLinkPress={run} />
+          <Markdown key={key} text={`[${istZu ? PFEIL_ZU : PFEIL_AUF}](${ziel}#${anker(key)})`} pressableLinks={[`${ziel}#${anker(key)}`]} onLinkPress={run} />
         ) : (
           <Button key={key} onPress={run}>
             {istZu ? PFEIL_ZU : PFEIL_AUF}
