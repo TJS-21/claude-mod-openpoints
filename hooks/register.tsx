@@ -19,6 +19,21 @@ let DATEN = STANDARD.datenRepo
 let AUTOR = ['-c', `user.name=${STANDARD.name}`, '-c', `user.email=${STANDARD.email}`]
 let VORNAME = 'Timo'
 let REGELN = regeln(VORNAME)
+// Ordner der laufenden Sitzung: neue Punkte gehören ins Projekt dieses Ordners
+let ORDNER = ''
+
+// Aus einem Ordnernamen den slug der Liste: „MAT_Speakerseite“ → „mat-speakerseite“
+function ordnerSlug(name: string): string {
+  const umlaute: Record<string, string> = { ä: 'ae', ö: 'oe', ü: 'ue', ß: 'ss' }
+  return name.toLowerCase().replace(/[äöüß]/g, c => umlaute[c] ?? c).replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 60)
+}
+
+// Zusatz zur Regel, sobald der Ordner der Sitzung bekannt ist; nur schlichte Namen kommen in den Systemprompt
+function ordnerRegel(): string {
+  const slug = ordnerSlug(ORDNER)
+  if (slug === '' || !/^[\p{L}\p{N} ._-]{1,60}$/u.test(ORDNER)) return ''
+  return `\nDiese Sitzung läuft im Ordner „${ORDNER}“. Punkte aus dieser Sitzung gehören ins Projekt „${ORDNER}“ (slug \`${slug}\`), auch wenn es die Liste noch nicht gibt. Nur was erkennbar nichts mit diesem Ordner zu tun hat, kommt in ein anderes passendes Projekt oder nach „Allgemein“.`
+}
 const SLUG = /^[a-z0-9][a-z0-9-]*$/
 // Zeichen zum Auf- und Zuklappen: zugeklappt ein mittelgroßes Dreieck nach unten (wie bei einem Drop-down), aufgeklappt ein Minus
 const PFEIL_ZU = '⏷'
@@ -491,6 +506,7 @@ export const register: Register = (on, options) => {
       },
     })
     const started = await next(e)
+    ORDNER = (e.cwd ?? '').split('/').filter(x => x !== '').pop() ?? ''
     void laden($)
     void leisteAuf($)
     return started
@@ -506,7 +522,7 @@ export const register: Register = (on, options) => {
   on('prompt.compose', async ($, e, next) => {
     const r = await next(e)
     if (e.surfaces.length === 0) return r
-    return { ...r, sections: [...r.sections, { id: 'openpoints:regeln', text: REGELN, scope: 'session' as const }] }
+    return { ...r, sections: [...r.sections, { id: 'openpoints:regeln', text: REGELN + ordnerRegel(), scope: 'session' as const }] }
   })
 
   on('tool.call', { tool: TOOL_SETZEN }, async ($, e) => {

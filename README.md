@@ -16,7 +16,7 @@ Eine Claude-Code-Mod: offene Aufgaben je Projekt, die sich selbst füllen.
 ## Punkte entstehen im Chat
 - Nennt eine Antwort Aufgaben für dich oder wird etwas vertagt, fragt Claude am Ende kurz, ob es die Punkte auf die Liste setzen soll (mit Wortlaut und Projekt). Jeder Punkt bekommt einen kurzen Titel und einen Kontext in 1–3 Sätzen, damit man auch nach Tagen weiß, wo es weitergeht. Eingetragen wird erst nach deinem OK (`punkte_hinzufuegen`); so entscheidest du mit dem vollen Zusammenhang des Chats.
 - Erledigtes hakt Claude im Gespräch ab (`punkte_erledigt`), veraltete Punkte klärt es mit dir (`punkte_klaeren`).
-- Was in kein Projekt passt, kommt nach „Allgemein“.
+- Das Projekt eines Punkts ist der Ordner der Sitzung, in der er entsteht (Ordner „MAT_Speakerseite“ → Liste `mat-speakerseite`). Was erkennbar nicht zum Ordner gehört, kommt in ein anderes passendes Projekt oder nach „Allgemein“.
 - Ohne Oberfläche (`claude -p`, etwa aus n8n) gilt die Regel nicht. Aufrufe über die Claude-API laufen gar nicht durch Claude Code.
 
 ## Daten
