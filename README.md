@@ -3,7 +3,7 @@
 Eine Claude-Code-Mod: offene Aufgaben je Projekt, die sich selbst füllen.
 
 ## Anzeige
-- **Band über dem Eingabefeld**: „Offene Punkte: Projekt 4 · 2 neu“ mit Knopf **Öffnen**.
+- **Band über dem Eingabefeld**: schmaler grauer Streifen „Offene Punkte: Projekt 4“, ganz rechts der Link **Öffnen** bzw. **Einklappen**, je nachdem, ob das Panel offen ist (im Terminal ein Knopf). Andere Bänder (z. B. die Nutzungsleiste) bleiben darunter sichtbar.
 - **Panel** (öffnet sich beim Start von selbst, sonst `/offene-punkte`): je Punkt Text, Web-Link „Zum Chat“ und die Knöpfe **Erledigt · Zum Chat · Frage dazu · Veraltet**, alle in derselben Farbe.
 - Klicks in der Leiste ändern nur die Liste und schreiben **nichts in den laufenden Chat**; oben zeigt eine Zeile, was passiert ist („Abgehakt: …“).
   - **Erledigt** hakt ab (mit **Zurück**, 14 Tage sichtbar).
@@ -39,7 +39,7 @@ claude plugin install openpoints --marketplace TJS-21/claude-mod-openpoints
 
 In der Desktop-App: Plus neben dem Eingabefeld, dann Plugins, „Add marketplace“ mit `TJS-21/claude-mod-openpoints`, danach „Add plugin“.
 
-Beide Repos sind privat. Installieren klappt nur auf einem Rechner, auf dem Git bereits bei github.com angemeldet ist (SSH-Schlüssel oder `gh auth login` und danach `gh auth setup-git`).
+Der Code der Mod (dieses Repo) ist öffentlich, die Listen liegen in einem eigenen **privaten** Daten-Repo. Damit die Mod die Listen abgleichen kann, muss Git auf dem Rechner bei github.com angemeldet sein (SSH-Schlüssel oder `gh auth login` und danach `gh auth setup-git`).
 
 ## Für andere Personen: eigene Listen
 
@@ -47,7 +47,7 @@ Jede Person nutzt ihr eigenes privates Daten-Repo; den Code teilt man sich.
 
 1. Auf GitHub ein **privates** Repo anlegen, z. B. `claude-openpoints-daten`, und dabei **„Add a README file“** ankreuzen (ein ganz leeres Repo kann die Mod nicht abgleichen).
 2. Git auf dem Mac bei GitHub anmelden: `gh auth login`, danach `gh auth setup-git`.
-3. Marketplace hinzufügen und installieren: `claude plugin marketplace add TJS-21/claude-mod-openpoints`, dann `claude plugin install openpoints@tjs-21-mods`. Dafür braucht es eine Einladung ins Repo `TJS-21/claude-mod-openpoints`.
+3. Marketplace hinzufügen und installieren: `claude plugin marketplace add TJS-21/claude-mod-openpoints`, dann `claude plugin install openpoints@tjs-21-mods`.
 4. Beim Installieren fragt Claude Code drei Einstellungen ab (später unter `/config` änderbar):
    - **Daten-Repo**: die Adresse aus Schritt 1, z. B. `https://github.com/<name>/claude-openpoints-daten`
    - **Name**: mit dem Vornamen spricht Claude dich an; der ganze Name steht als Autor der Änderungen

@@ -119,7 +119,7 @@ async function git($: EngineInterface, dir: string, args: string[]) {
 // Holt den Stand von GitHub; bei einem Konflikt wird der Rebase abgebrochen, damit das Repo nicht hängen bleibt.
 async function abgleichen($: EngineInterface, dir: string): Promise<string> {
   if (!(await $.fs.exists(`${dir}/.git`))) {
-    const r = await $.process.run(['git', 'clone', '-q', DATEN, dir], { timeoutMs: 120000 })
+    const r = await $.process.run(['git', 'clone', '-q', '--', DATEN, dir], { timeoutMs: 120000 })
     return r.exitCode === 0 ? '' : 'Daten-Repo nicht erreichbar. Ist Git bei GitHub angemeldet?'
   }
   const r = await git($, dir, ['pull', '--rebase', '--autostash', '-q'])
@@ -460,7 +460,8 @@ export const register: Register = (on, options) => {
       projekt: input.projekt,
       punkte: input.punkte.map(p => {
         const vorher = alt?.punkte.find(a => a.id === p.id)
-        const chat = p.chat ?? vorher?.chat
+        // Nur echte Web-Links übernehmen (wie bei punkte_hinzufuegen); sonst bleibt der alte
+        const chat = p.chat !== undefined && p.chat.startsWith('https://') ? p.chat : vorher?.chat
         const isDone = p.isDone ?? vorher?.isDone ?? false
         const anders = vorher === undefined || vorher.text !== p.text || vorher.isDone !== isDone
         return {
@@ -607,7 +608,7 @@ export const register: Register = (on, options) => {
                 return (
                   <Box flexDirection="column">
                     <Text>{alt ? '(alt?) ' : ''}{p.text}</Text>
-                    {p.chat !== undefined && p.chat !== '' && <Link href={p.chat}>Zum Chat</Link>}
+                    {p.chat !== undefined && p.chat.startsWith('https://') && <Link href={p.chat}>Zum Chat</Link>}
                     <Box flexDirection="row" gap={1}>
                       <Button
                         key={`done-${l.slug}-${p.id}`}

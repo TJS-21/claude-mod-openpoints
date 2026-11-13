@@ -86,6 +86,16 @@ function attrappe(on: On, opts: Opts = {}) {
 
 // ---- Speichern ----
 
+test('punkte_setzen übernimmt nur https-Links als Chat-Link', async ($, on) => {
+  const a = attrappe(on)
+  await $.tool.call({
+    tool: SETZEN, slug: 'web', projekt: 'Web',
+    punkte: [{ id: 'a', text: 'Alt', chat: 'file:///etc/passwd' }, { id: 'b', text: 'Neu', chat: 'javascript:alert(1)' }],
+  } as never)
+  expect(a.liste().punkte[0]?.chat).toBe(`https://claude.ai/chat/${UUID}`)
+  expect(a.liste().punkte[1]?.chat).toBeUndefined()
+})
+
 test('punkte_setzen speichert, behält Status und Chat-Link und committet nur die Listendatei', async ($, on) => {
   const a = attrappe(on)
   const r = await $.tool.call({
@@ -398,7 +408,7 @@ test('eigene Einstellungen: eigenes Repo wird in einen eigenen Ordner geklont, e
   const a = attrappe(on, { dir: ANNA_DIR, ohneKlon: true })
   const r = await $.tool.call({ tool: HINZU, punkte: [{ slug: 'allgemein', projekt: 'Allgemein', text: 'Steuer machen' }] } as never)
   expect(r.result).toContain('1 eingetragen')
-  expect(a.aufrufe).toContainEqual(['git', 'clone', '-q', 'https://github.com/anna/listen', ANNA_DIR])
+  expect(a.aufrufe).toContainEqual(['git', 'clone', '-q', '--', 'https://github.com/anna/listen', ANNA_DIR])
   expect(a.aufrufe).toContainEqual(['mkdir', '-p', `${ANNA_DIR}/punkte`])
   const commit = a.aufrufe.find(x => x.includes('commit')) ?? []
   expect(commit.slice(0, 7)).toEqual(['git', '-C', ANNA_DIR, '-c', 'user.name=Anna Beispiel', '-c', 'user.email=anna@example.com'])
