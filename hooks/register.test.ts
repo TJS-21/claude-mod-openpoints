@@ -627,3 +627,13 @@ test('ein Ordnername mit Sonderzeichen kommt nicht in die Regel', async ($, on) 
   // das Laden der Listen aus session.start zu Ende laufen lassen
   await new Promise(r => setTimeout(r, 30))
 })
+
+test('jeder zweite Punkt ist leicht unterlegt', async ($, on) => {
+  attrappe(on, { punkte: [{ id: 'a', text: 'Eins', isDone: false }, { id: 'b', text: 'Zwei', isDone: false }, { id: 'c', text: 'Drei', isDone: false }] })
+  await $.tool.call({ tool: SETZEN, slug: 'web', projekt: 'Web', punkte: [{ id: 'a', text: 'Eins' }, { id: 'b', text: 'Zwei' }, { id: 'c', text: 'Drei' }] } as never)
+  const ui = await $.ui.mount({ ...PANE, surface: 'desktop' } as never)
+  const farbe = async (id: string) => ((await ui.find({ type: 'Box', key: `punkt-web-${id}` } as never)) as { props?: { backgroundColor?: string } } | undefined)?.props?.backgroundColor
+  expect(await farbe('a')).toBeUndefined()
+  expect(await farbe('b')).toBe('#262628')
+  expect(await farbe('c')).toBeUndefined()
+})

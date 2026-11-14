@@ -38,6 +38,8 @@ const SLUG = /^[a-z0-9][a-z0-9-]*$/
 // Zeichen zum Auf- und Zuklappen: zugeklappt ein mittelgroßes Dreieck nach unten (wie bei einem Drop-down), aufgeklappt ein Minus
 const PFEIL_ZU = '⏷'
 const PFEIL_AUF = '−'
+// Jeder zweite Punkt ist ganz leicht heller unterlegt, damit man die Punkte auseinanderhält
+const ZEBRA = '#262628'
 // Kennung eines Punkts: wie ein slug, damit sie gefahrlos in Link-Adressen und Tasten-Schlüsseln stehen kann
 const ID = /^[a-z0-9][a-z0-9-]{0,79}$/
 // Für Link-Adressen: alles außer Buchstaben, Ziffern, - und _ ersetzen (auch für alte oder von Hand geänderte Listen)
@@ -735,7 +737,7 @@ export const register: Register = (on, options) => {
           return (
             <Box key={`liste-${l.slug}`} flexDirection="column" gap={1}>
               {kopf(`fold-${l.slug}`, l.projekt, offenePunkte.length, istZu, () => void update($, zu, z => (istZu ? z.filter(s => s !== l.slug) : [...z, l.slug])), true)}
-              {!istZu && offenePunkte.map(p => {
+              {!istZu && offenePunkte.map((p, nr) => {
                 const chatId = p.chat !== undefined ? CHAT.exec(p.chat)?.[1] : undefined
                 const chatUrl = chatId !== undefined ? `https://claude.ai/chat/${chatId}` : undefined
                 const alt = tageSeit(p.geaendert ?? p.erstellt, tag) >= ALT_TAGE
@@ -757,7 +759,7 @@ export const register: Register = (on, options) => {
                 const bereich = `punkt:${l.slug}:${p.id}`
                 const istAuf = offeneBereiche.includes(bereich)
                 return (
-                  <Box key={`punkt-${l.slug}-${p.id}`} flexDirection="column">
+                  <Box key={`punkt-${l.slug}-${p.id}`} flexDirection="column" {...(nr % 2 === 1 ? { backgroundColor: ZEBRA } : {})}>
                     <Box key={`titel-${l.slug}-${p.id}`} flexDirection="row" alignItems="flex-start" justifyContent="space-between" gap={1} paddingX={1}>
                       <Box flexShrink={1}>
                         <Text>{alt ? '(alt?) ' : ''}{p.text}</Text>
