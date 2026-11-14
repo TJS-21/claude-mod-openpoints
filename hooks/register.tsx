@@ -38,8 +38,8 @@ const SLUG = /^[a-z0-9][a-z0-9-]*$/
 // Zeichen zum Auf- und Zuklappen: zugeklappt ein mittelgroßes Dreieck nach unten (wie bei einem Drop-down), aufgeklappt ein Minus
 const PFEIL_ZU = '⏷'
 const PFEIL_AUF = '−'
-// Jeder zweite Punkt ist ganz leicht heller unterlegt, damit man die Punkte auseinanderhält
-const ZEBRA = '#262628'
+// Dünne Trennlinie zwischen zwei Punkten: 1 Pixel hoch, dehnt sich auf die Breite der Seitenleiste
+const LINIE = '<svg xmlns="http://www.w3.org/2000/svg" width="2000" height="1" viewBox="0 0 2000 1" preserveAspectRatio="none"><rect width="2000" height="1" fill="#3A3A3C"/></svg>'
 // Kennung eines Punkts: wie ein slug, damit sie gefahrlos in Link-Adressen und Tasten-Schlüsseln stehen kann
 const ID = /^[a-z0-9][a-z0-9-]{0,79}$/
 // Für Link-Adressen: alles außer Buchstaben, Ziffern, - und _ ersetzen (auch für alte oder von Hand geänderte Listen)
@@ -651,7 +651,10 @@ export const register: Register = (on, options) => {
   })
 
   on('ui.render', { component: 'Pane', requestId: PANE }, async ($, e) => {
-    const { Box, Text, Button, Link, Markdown } = $.ui.resolve(e)
+    const elemente = $.ui.resolve(e)
+    const { Box, Text, Button, Link, Markdown } = elemente
+    // Das Terminal kann keine Grafik: dort keine Trennlinien
+    const Svg = e.surface !== 'terminal' && 'Svg' in elemente ? elemente.Svg : undefined
     const alle = await read($, listen)
     const zugeklappt = await read($, zu)
     const offeneBereiche = await read($, auf)
@@ -759,7 +762,12 @@ export const register: Register = (on, options) => {
                 const bereich = `punkt:${l.slug}:${p.id}`
                 const istAuf = offeneBereiche.includes(bereich)
                 return (
-                  <Box key={`punkt-${l.slug}-${p.id}`} flexDirection="column" {...(nr % 2 === 1 ? { backgroundColor: ZEBRA } : {})}>
+                  <Box key={`punkt-${l.slug}-${p.id}`} flexDirection="column" gap={1}>
+                    {nr > 0 && Svg !== undefined && (
+                      <Box key={`linie-${l.slug}-${p.id}`} overflow="hidden">
+                        <Svg source={LINIE} alt="" height={1} />
+                      </Box>
+                    )}
                     <Box key={`titel-${l.slug}-${p.id}`} flexDirection="row" alignItems="flex-start" justifyContent="space-between" gap={1} paddingX={1}>
                       <Box flexShrink={1}>
                         <Text>{alt ? '(alt?) ' : ''}{p.text}</Text>

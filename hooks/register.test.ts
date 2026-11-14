@@ -628,12 +628,13 @@ test('ein Ordnername mit Sonderzeichen kommt nicht in die Regel', async ($, on) 
   await new Promise(r => setTimeout(r, 30))
 })
 
-test('jeder zweite Punkt ist leicht unterlegt', async ($, on) => {
+test('zwischen zwei Punkten steht eine dünne Trennlinie, im Terminal keine', async ($, on) => {
   attrappe(on, { punkte: [{ id: 'a', text: 'Eins', isDone: false }, { id: 'b', text: 'Zwei', isDone: false }, { id: 'c', text: 'Drei', isDone: false }] })
   await $.tool.call({ tool: SETZEN, slug: 'web', projekt: 'Web', punkte: [{ id: 'a', text: 'Eins' }, { id: 'b', text: 'Zwei' }, { id: 'c', text: 'Drei' }] } as never)
   const ui = await $.ui.mount({ ...PANE, surface: 'desktop' } as never)
-  const farbe = async (id: string) => ((await ui.find({ type: 'Box', key: `punkt-web-${id}` } as never)) as { props?: { backgroundColor?: string } } | undefined)?.props?.backgroundColor
-  expect(await farbe('a')).toBeUndefined()
-  expect(await farbe('b')).toBe('#262628')
-  expect(await farbe('c')).toBeUndefined()
+  expect((await ui.findAll({ type: 'Svg' } as never)).length).toBe(2)
+  expect(JSON.stringify(await ui.findAll({ type: 'Box' } as never))).not.toContain('#262628')
+  await ui.unmount()
+  const term = await $.ui.mount({ ...PANE, surface: 'terminal' } as never)
+  expect(await term.find({ type: 'Text', text: 'Zwei' })).toBeDefined()
 })
